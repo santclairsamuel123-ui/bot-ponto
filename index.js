@@ -242,4 +242,91 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Login do Bot
+client.login(MTU2MzE1NTAwMDMwODI3NzM3OQ.GvuRrR.n3phAMU_epGkSDTn6r7pGFZp7Pby_rhmtrZ-eU);
+
+
+// ==========================================
+// SISTEMA DE REGISTRO
+// ==========================================
+const CARGO_CIDADAO_ID = '1562603190653026352'; // Subtitua pelo ID do cargo no Discord
+
+client.on('interactionCreate', async (interaction) => {
+
+  // 1. Abrir o formulário ao clicar no botão
+  if (interaction.isButton() && interaction.customId === 'btn_abrir_registro') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_registro')
+      .setTitle('Registro de Cidadão');
+
+    const inputNome = new TextInputBuilder()
+      .setCustomId('input_nome')
+      .setLabel('Seu Nome no Jogo')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: João Silva')
+      .setRequired(true);
+
+    const inputID = new TextInputBuilder()
+      .setCustomId('input_id')
+      .setLabel('Seu ID no Jogo')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 1234')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(inputNome),
+      new ActionRowBuilder().addComponents(inputID)
+    );
+
+    await interaction.showModal(modal);
+  }
+
+  // 2. Processar o formulário preenchido
+  if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
+    const nome = interaction.fields.getTextInputValue('input_nome');
+    const idJogo = interaction.fields.getTextInputValue('input_id');
+
+    const novoApelido = `${nome} | ${idJogo}`;
+
+    try {
+      const membro = interaction.member;
+
+      await membro.setNickname(novoApelido);
+      await membro.roles.add(CARGO_CIDADAO_ID);
+
+      await interaction.reply({
+        content: `✅ Registro concluído com sucesso! Bem-vindo(a), **${novoApelido}**.`,
+        flags: MessageFlags.Ephemeral
+      });
+    } catch (error) {
+      console.error('Erro no registro:', error);
+      await interaction.reply({
+        content: '❌ Erro ao registrar. Verifique se o meu cargo está acima do cargo Cidadão nas configurações do servidor.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+  }
+});
+
+// ==========================================
+// ENVIAR PAINEL AUTOMATICAMENTE AO LIGAR
+// ==========================================
+client.once('ready', async () => {
+  // Substitui pelo ID real do canal de registro do teu Discord
+  const canalRegistro = client.channels.cache.get('1562603191324115091');
+
+  if (canalRegistro) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('btn_abrir_registro')
+        .setLabel('Registrar-se')
+        .setStyle(ButtonStyle.Success)
+    );
+
+    await canalRegistro.send({
+      content: '📋 **REGISTRO DE CIDADÃO**\n\nClica no botão abaixo para preencher o teu Nome e ID e liberar o teu acesso ao servidor!',
+      components: [row]
+    });
+  }
+});
+
 client.login(process.env.DISCORD_TOKEN);
