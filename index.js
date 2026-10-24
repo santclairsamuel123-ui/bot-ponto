@@ -1,12 +1,3 @@
-const { 
-  Client, 
-  GatewayIntentBits, 
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  PermissionFlagsBits 
-} = require('discord.js');
 const {
   Client,
   GatewayIntentBits,
@@ -34,7 +25,7 @@ app.listen(PORT, () => {
 // CONFIGURAÇÕES DO SEU BOT
 // ===================================================
 const CONFIG = {
-  TOKEN: 'MTU2MzE1NTAwMDMwODI3NzM3OQ.GTd6MV.-T-QR6OjDcRCNbD4DvB3foxKCBbZXGOWPNlGSY',                   // Token do seu bot do Discord
+  TOKEN: 'MTU2MzE1NTAwMDMwODI3NzM3OQ.Gu_Z0d.aTHykmfTbTED-aGSRMOrzZHUxupRrcyDnJEvT8',                   // Token do seu bot do Discord
   ID_CANAL_LOGS: '1563319588614045776',      // ID do canal onde as logs de ponto serão enviadas
   BANNER_URL: 'https://i.imgur.com/4F7hNnz.png',     // URL da imagem/banner da sua organização
   COR_EMBED: '#2b2d31'                        // Cor hexadecimal da mensagem (padrão escuro do Discord)
