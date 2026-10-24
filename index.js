@@ -329,4 +329,5 @@ client.once('ready', async () => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+// Login do Bot
+client.login(MTU2MzE1NTAwMDMwODI3NzM3OQ.GvuRrR.n3phAMU_epGkSDTn6r7pGFZp7Pby_rhmtrZ-eU);
