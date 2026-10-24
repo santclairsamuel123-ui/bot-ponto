@@ -348,3 +348,5 @@ client.on('guildMemberRemove', (member) => {
 
   canal.send(`📤 **${member.user.tag}** saiu do servidor.`);
 });
+
+
