@@ -406,35 +406,42 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
     // 2. QUANDO O USUÁRIO ENVIA O FORMULÁRIO PREENCHIDO
-    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
-      // Adia a resposta para evitar timeout de 3 segundos
-      await interaction.deferReply({ ephemeral: true });
+if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
+  // Adia a resposta para evitar timeout de 3 segundos
+  await interaction.deferReply({ ephemeral: true });
 
-      const nome = interaction.fields.getTextInputValue('input_nome');
-      const id = interaction.fields.getTextInputValue('input_id');
+  const nome = interaction.fields.getTextInputValue('input_nome');
+  const id = interaction.fields.getTextInputValue('input_id');
 
-      const novoApelido = `${nome} | ${id}`;
+  const novoApelido = `${nome} | ${id}`;
 
-      // Tenta mudar o apelido no servidor
-      try {
-        if (interaction.member.manageable) {
-          await interaction.member.setNickname(novoApelido);
-        }
-      } catch (err) {
-        console.log('Aviso: Não foi possível alterar o apelido (permissão ou dono do servidor).');
-      }
-
-      // Adiciona o cargo de Cidadão
-      const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
-      if (cargo) {
-        await interaction.member.roles.add(cargo);
-      }
-
-      // Confirma para o usuário
-      await interaction.editReply({
-        content: `✅ **Registro concluído com sucesso!**\n\n**Nome/ID definido:** ${novoApelido}`
-      });
+  // Tenta mudar o apelido no servidor
+  try {
+    if (interaction.member.manageable) {
+      await interaction.member.setNickname(novoApelido);
     }
+  } catch (err) {
+    console.log('Aviso: Não foi possível alterar o apelido (permissão ou dono do servidor).');
+  }
+
+  // Adicionar o cargo de Cidadão
+  const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
+  if (cargo) {
+    await interaction.member.roles.add(cargo);
+  }
+
+  // 📢 ENVIAR LOG PARA O CANAL DO DISCORD
+  await enviarLog(
+    interaction.guild,
+    '📋 Novo Registro Realizado',
+    `**Membro:** ${interaction.user} (${interaction.user.tag})\n**Nome no Jogo:** ${nome}\n**ID:** ${id}\n**Novo Apelido:** \`${novoApelido}\``,
+    0x0099FF
+  );
+
+  await interaction.editReply({
+    content: `✅ Registro concluído com sucesso! Bem-vindo(a), **${novoApelido}**.`
+  });
+}
 
   } catch (error) {
     console.error('❌ Erro na interação de registro:', error);
@@ -489,3 +496,23 @@ client.once('ready', async () => {
 
 // Login do Bot
 client.login(process.env.DISCORD_TOKEN)
+
+// Podes colar esta parte bem no final de tudo do teu index.js
+const ID_CANAL_LOGS = '1562603191324115092'; 
+
+async function enviarLog(guild, titulo, descricao, cor = 0x00FF00) {
+  try {
+    const canalLogs = await guild.channels.fetch(ID_CANAL_LOGS).catch(() => null);
+    if (!canalLogs) return;
+
+    const embedLog = new EmbedBuilder()
+      .setTitle(titulo)
+      .setDescription(descricao)
+      .setColor(cor)
+      .setTimestamp();
+
+    await canalLogs.send({ embeds: [embedLog] });
+  } catch (error) {
+    console.error('Erro ao enviar log:', error);
+  }
+}
