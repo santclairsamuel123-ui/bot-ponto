@@ -310,22 +310,40 @@ client.on('interactionCreate', async (interaction) => {
 // ==========================================
 // ENVIAR PAINEL AUTOMATICAMENTE AO LIGAR
 // ==========================================
+// ==========================================
+// ENVIAR PAINEL AUTOMATICAMENTE (SEM FLOOD)
+// ==========================================
 client.once('ready', async () => {
-  // Substitui pelo ID real do canal de registro do teu Discord
+  console.log(`Bot online como ${client.user.tag}!`);
+
+  // Substitui pelo ID real do teu canal de registro
   const canalRegistro = client.channels.cache.get('1562603191324115091');
 
   if (canalRegistro) {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('btn_abrir_registro')
-        .setLabel('Registrar-se')
-        .setStyle(ButtonStyle.Success)
-    );
+    try {
+      // 1. Procura e apaga as mensagens antigas enviadas pelo bot no canal para evitar flood
+      const mensagens = await canalRegistro.messages.fetch({ limit: 10 });
+      const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
+      
+      if (mensagensDoBot.size > 0) {
+        await canalRegistro.bulkDelete(mensagensDoBot);
+      }
 
-    await canalRegistro.send({
-      content: '📋 **REGISTRO DE CIDADÃO**\n\nClica no botão abaixo para preencher o teu Nome e ID e liberar o teu acesso ao servidor!',
-      components: [row]
-    });
+      // 2. Envia apenas uma nova mensagem limpa com o botão
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('btn_abrir_registro')
+          .setLabel('Registrar-se')
+          .setStyle(ButtonStyle.Success)
+      );
+
+      await canalRegistro.send({
+        content: '📋 **REGISTRO DE CIDADÃO**\n\nClica no botão abaixo para preencher o teu Nome e ID e liberar o teu acesso ao servidor!',
+        components: [row]
+      });
+    } catch (error) {
+      console.error('Erro ao limpar/enviar painel de registro:', error);
+    }
   }
 });
 
