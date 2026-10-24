@@ -6,7 +6,8 @@ const {
   ButtonStyle, 
   ModalBuilder, 
   TextInputBuilder, 
-  TextInputStyle 
+  TextInputStyle,
+  EmbedBuilder
 } = require('discord.js');
 
 // === SERVIDOR PARA MANTER O BOT ONLINE NA RENDER ===
@@ -14,7 +15,7 @@ const express = require('express');
 const app = express();
 
 app.get('/', (req, res) => {
-  res.send('Bot de Ponto está Online!');
+  res.send('Bot Online e Funcionando!');
 });
 
 const PORT = process.env.PORT || 3000;
@@ -23,13 +24,17 @@ app.listen(PORT, () => {
 });
 
 // ===================================================
-// CONFIGURAÇÕES DO SEU BOT
+// CONFIGURAÇÕES DO BOT
 // ===================================================
 const CONFIG = {
-  ID_CANAL_LOGS: '1563319588614045776',
+  ID_CANAL_LOGS_PONTO: '1563319588614045776',
   BANNER_URL: 'https://i.imgur.com/4F7hNnz.png',
   COR_EMBED: '#2b2d31'
 };
+
+const CARGO_CIDADAO_ID = '1562603190653026352'; 
+const ID_CANAL_LOGS_REGISTRO = '1562603191324115092'; 
+const ID_CANAL_PAINEL_REGISTRO = '1562603191324115091';
 
 // Objeto para armazenar as sessões de bate-ponto ativas em memória
 const sessoesPonto = new Map();
@@ -37,26 +42,58 @@ const sessoesPonto = new Map();
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent
   ]
 });
 
-client.once('ready', () => {
+// ===================================================
+// EVENTO READY (LIGAR E ENVIAR PAINEL DE REGISTRO)
+// ===================================================
+client.once('ready', async () => {
   console.log(`✅ Bot online como ${client.user.tag}!`);
+
+  // Limpa e envia o painel de registro automaticamente no canal configurado
+  const canalRegistro = client.channels.cache.get(ID_CANAL_PAINEL_REGISTRO);
+  if (canalRegistro) {
+    try {
+      const mensagens = await canalRegistro.messages.fetch({ limit: 10 });
+      const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
+      
+      if (mensagensDoBot.size > 0) {
+        await canalRegistro.bulkDelete(mensagensDoBot);
+      }
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('btn_abrir_registro')
+          .setLabel('Registrar-se')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('📋')
+      );
+
+      await canalRegistro.send({
+        content: '📋 **REGISTRO DE CIDADÃO**\n\nClica no botão abaixo para preencher o teu Nome e ID e liberar o teu acesso ao servidor!',
+        components: [row]
+      });
+    } catch (error) {
+      console.error('Erro ao limpar/enviar painel de registro:', error);
+    }
+  }
 });
 
-// Comando de Prefixo para Painel: "!ponto"
+// ===================================================
+// COMANDO DE PREFIXO: "!ponto"
+// ===================================================
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   if (message.content === '!ponto') {
-    // Permissão para o criador do bot
     if (message.author.id !== '840326310701432854') {
       return message.reply('❌ **Acesso negado:** Apenas o meu criador tem permissão para usar este comando.');
     }
 
-    // Painel Principal de Bate-Ponto
     const embedPainel = new EmbedBuilder()
       .setTitle('📌 **SISTEMA DE BATE-PONTO**')
       .setDescription(
@@ -71,7 +108,6 @@ client.on('messageCreate', async (message) => {
       .setImage(CONFIG.BANNER_URL)
       .setFooter({ text: 'Sistema Oficial de Ponto • Registro automatizado', iconURL: message.guild ? message.guild.iconURL() : null });
 
-    // Botões Interativos
     const botoes = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('btn_iniciar')
@@ -100,255 +136,19 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// Manipulador das Interações de Botão
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isButton()) return;
-
-  const { customId, user, guild } = interaction;
-  const userId = user.id;
-  const agora = new Date();
-
-  const canalLogs = guild ? guild.channels.cache.get(CONFIG.ID_CANAL_LOGS) : null;
-
-  // 🟢 INICIAR BATE-PONTO
-  if (customId === 'btn_iniciar') {
-    if (sessoesPonto.has(userId)) {
-      return interaction.reply({
-        content: '⚠️ Você já possui um bate-ponto ativo neste momento!',
-        ephemeral: true
-      });
-    }
-
-    sessoesPonto.set(userId, {
-      status: 'ativo',
-      startTime: agora,
-      totalPauseMs: 0,
-      lastPauseStart: null
-    });
-
-    await interaction.reply({
-      content: `🟢 **Ponto iniciado com sucesso!** Horário: <t:${Math.floor(agora.getTime() / 1000)}:T>`,
-      ephemeral: true
-    });
-  }
-
-  // 🟡 PAUSAR BATE-PONTO
-  else if (customId === 'btn_pausar') {
-    const sessao = sessoesPonto.get(userId);
-
-    if (!sessao) {
-      return interaction.reply({
-        content: '❌ Você ainda não iniciou um bate-ponto!',
-        ephemeral: true
-      });
-    }
-
-    if (sessao.status === 'pausado') {
-      return interaction.reply({
-        content: '⚠️ Seu bate-ponto já está pausado!',
-        ephemeral: true
-      });
-    }
-
-    sessao.status = 'pausado';
-    sessao.lastPauseStart = agora;
-
-    await interaction.reply({
-      content: `🟡 **Pausa iniciada!** Seu tempo está congelado até o retorno.`,
-      ephemeral: true
-    });
-  }
-
-  // 🔵 RETORNAR DA PAUSA
-  else if (customId === 'btn_retornar') {
-    const sessao = sessoesPonto.get(userId);
-
-    if (!sessao) {
-      return interaction.reply({
-        content: '❌ Você ainda não iniciou um bate-ponto!',
-        ephemeral: true
-      });
-    }
-
-    if (sessao.status === 'ativo') {
-      return interaction.reply({
-        content: '⚠️ Seu bate-ponto já está em andamento (não estava pausado)!',
-        ephemeral: true
-      });
-    }
-
-    const duracaoPausa = agora.getTime() - sessao.lastPauseStart.getTime();
-    sessao.totalPauseMs += duracaoPausa;
-    sessao.lastPauseStart = null;
-    sessao.status = 'ativo';
-
-    await interaction.reply({
-      content: `🔵 **Retorno confirmado!** Seu tempo de trabalho voltou a ser contado.`,
-      ephemeral: true
-    });
-  }
-
-  // 🔴 ENCERRAR BATE-PONTO E GERAR LOG
-  else if (customId === 'btn_encerrar') {
-    const sessao = sessoesPonto.get(userId);
-
-    if (!sessao) {
-      return interaction.reply({
-        content: '❌ Você não tem nenhum bate-ponto aberto para encerrar.',
-        ephemeral: true
-      });
-    }
-
-    if (sessao.status === 'pausado' && sessao.lastPauseStart) {
-      sessao.totalPauseMs += (agora.getTime() - sessao.lastPauseStart.getTime());
-    }
-
-    const duracaoTotalMs = agora.getTime() - sessao.startTime.getTime();
-    const tempoEfetivoMs = Math.max(0, duracaoTotalMs - sessao.totalPauseMs);
-
-    const totalSegundos = Math.floor(tempoEfetivoMs / 1000);
-    const horas = Math.floor(totalSegundos / 3600);
-    const minutos = Math.floor((totalSegundos % 3600) / 60);
-    const segundos = totalSegundos % 60;
-
-    const tempoFormatado = `${horas}h ${minutos}m ${segundos}s`;
-
-    sessoesPonto.delete(userId);
-
-    await interaction.reply({
-      content: `🔴 **Ponto encerrado!** Seu tempo total trabalhado foi de **${tempoFormatado}**.`,
-      ephemeral: true
-    });
-
-    // Enviar Log
-    if (canalLogs) {
-      const embedLog = new EmbedBuilder()
-        .setTitle('📋 **REGISTRO DE BATE-PONTO**')
-        .setColor('#e74c3c')
-        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: '👤 Colaborador', value: `${user} (\`${user.id}\`)`, inline: true },
-          { name: '⏱️ Tempo Trabalhado', value: `\`${tempoFormatado}\``, inline: true },
-          { name: '🕒 Entrada', value: `<t:${Math.floor(sessao.startTime.getTime() / 1000)}:f>`, inline: false },
-          { name: '🛑 Saída', value: `<t:${Math.floor(agora.getTime() / 1000)}:f>`, inline: false }
-        )
-        .setTimestamp()
-        .setFooter({ text: 'Logs de Ponto', iconURL: guild ? guild.iconURL() : null });
-
-      await canalLogs.send({ embeds: [embedLog] });
-    } else {
-      console.error('❌ Canal de logs não encontrado! Verifique o ID configurado.');
-    }
-  }
-});
-
-// Login do Bot
-client.login(process.env.DISCORD_TOKEN);
-
-
-// ==========================================
-// SISTEMA DE REGISTRO
-// ==========================================
-// ==========================================
-// SISTEMA DE REGISTRO - RESPOSTA AOS BOTÕES E MODAL
-// ==========================================
-
+// ===================================================
+// GERENCIADOR DE INTERAÇÕES (BOTÕES E MODAIS)
+// ===================================================
 client.on('interactionCreate', async (interaction) => {
   try {
-    // 1. QUANDO O USUÁRIO CLICA NO BOTÃO "REGISTRAR-SE"
-    if (interaction.isButton() && interaction.customId === 'btn_abrir_registro') {
-      console.log(`[REGISTRO] Botão clicado por: ${interaction.user.tag}`);
+    const { customId, user, guild } = interaction;
+    const userId = user.id;
+    const agora = new Date();
 
-      // Cria o formulário (Modal)
-      const modal = new ModalBuilder()
-        .setCustomId('modal_registro')
-        .setTitle('Registro de Cidadão');
-
-      // Campo 1: Nome no Jogo
-      const inputNome = new TextInputBuilder()
-        .setCustomId('input_nome')
-        .setLabel('Seu Nome no Jogo')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: João Silva')
-        .setRequired(true);
-
-      // Campo 2: ID no Jogo
-      const inputID = new TextInputBuilder()
-        .setCustomId('input_id')
-        .setLabel('Seu ID no Jogo')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: 1234')
-        .setRequired(true);
-
-      const primeiraLinha = new ActionRowBuilder().addComponents(inputNome);
-      const segundaLinha = new ActionRowBuilder().addComponents(inputID);
-
-      modal.addComponents(primeiraLinha, segundaLinha);
-
-      // Exibe o formulário imediatamente para o usuário
-      await interaction.showModal(modal);
-      return;
-    }
-
-    // 2. QUANDO O USUÁRIO ENVIA O FORMULÁRIO PREENCHIDO
-    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
-      // Adia a resposta para evitar timeout de 3 segundos
-      await interaction.deferReply({ ephemeral: true });
-
-      const nome = interaction.fields.getTextInputValue('input_nome');
-      const id = interaction.fields.getTextInputValue('input_id');
-
-      const novoApelido = `${nome} | ${id}`;
-
-      // Tenta mudar o apelido no servidor
-      try {
-        if (interaction.member.manageable) {
-          await interaction.member.setNickname(novoApelido);
-        }
-      } catch (err) {
-        console.log('Aviso: Não foi possível alterar o apelido (permissão ou dono do servidor).');
-      }
-
-      // Adiciona o cargo de Cidadão
-      const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
-      if (cargo) {
-        await interaction.member.roles.add(cargo);
-      }
-
-      // Confirma para o usuário
-      await interaction.editReply({
-        content: `✅ **Registro concluído com sucesso!**\n\n**Nome/ID definido:** ${novoApelido}`
-      });
-    }
-
-  } catch (error) {
-    console.error('❌ Erro na interação de registro:', error);
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ 
-        content: '❌ Ocorreu um erro ao abrir o formulário de registro.', 
-        ephemeral: true 
-      }).catch(() => {});
-    }
-  }
-});
-
-  // 2. Processar o formulário preenchido
-  // ==========================================
-// SISTEMA DE REGISTRO - RESPOSTA AOS BOTÕES E MODAL
-// ==========================================
-
-// ID do cargo que o membro vai receber após se registrar
-const CARGO_CIDADAO_ID = '1562603190653026352'; 
-
-client.on('interactionCreate', async (interaction) => {
-  try {
-    // ==========================================
-// INTERAÇÃO DO BOTÃO E FORMULÁRIO DE REGISTRO
-// ==========================================
-client.on('interactionCreate', async (interaction) => {
-  try {
-    // 1. QUANDO CLICA NO BOTÃO "REGISTRAR-SE"
-    if (interaction.isButton() && interaction.customId === 'btn_abrir_registro') {
+    // -----------------------------------------------
+    // 1. SISTEMA DE REGISTRO (BOTÃO E MODAL)
+    // -----------------------------------------------
+    if (interaction.isButton() && customId === 'btn_abrir_registro') {
       const modal = new ModalBuilder()
         .setCustomId('modal_registro')
         .setTitle('Registro de Cidadão');
@@ -357,7 +157,7 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('input_nome')
         .setLabel('Seu Nome no Jogo')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: João Silva')
+        .setPlaceholder('Ex: Arthur Morgan')
         .setRequired(true);
 
       const inputID = new TextInputBuilder()
@@ -372,26 +172,24 @@ client.on('interactionCreate', async (interaction) => {
         new ActionRowBuilder().addComponents(inputID)
       );
 
-      // ABRIR O FORMULÁRIO NA HORA
       return await interaction.showModal(modal);
     }
 
-    // 2. QUANDO ENVIA O FORMULÁRIO PREENCHIDO
-    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
+    if (interaction.isModalSubmit() && customId === 'modal_registro') {
       await interaction.deferReply({ ephemeral: true });
 
       const nome = interaction.fields.getTextInputValue('input_nome');
-      const idJogo = interaction.fields.getTextInputValue('input_id');
-      const novoApelido = `${nome} | ${idJogo}`;
+      const id = interaction.fields.getTextInputValue('input_id');
+      const novoApelido = `${nome} | ${id}`;
 
-      // Alterar Apelido
       try {
-        await interaction.member.setNickname(novoApelido);
+        if (interaction.member.manageable) {
+          await interaction.member.setNickname(novoApelido);
+        }
       } catch (err) {
-        console.log('Não foi possível alterar apelido (permissão ou dono).');
+        console.log('Aviso: Não foi possível alterar o apelido (permissão ou dono).');
       }
 
-      // Adicionar Cargo
       const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
       if (cargo) {
         await interaction.member.roles.add(cargo);
@@ -400,110 +198,115 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.editReply({
         content: `✅ Registro concluído com sucesso! Bem-vindo(a), **${novoApelido}**.`
       });
+
+      await enviarLogRegistro(
+        interaction.guild,
+        '📋 Novo Registro Realizado',
+        `**Membro:** ${interaction.user} (${interaction.user.tag})\n**Nome no Jogo:** ${nome}\n**ID:** ${id}\n**Novo Apelido:** \`${novoApelido}\``,
+        0x0099FF
+      );
+      return;
     }
-  } catch (error) {
-    console.error('Erro na interação:', error);
-  }
-});
-    // 2. QUANDO O USUÁRIO ENVIA O FORMULÁRIO PREENCHIDO
-if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
-  // Adia a resposta para evitar timeout de 3 segundos
-  await interaction.deferReply({ ephemeral: true });
 
-  const nome = interaction.fields.getTextInputValue('input_nome');
-  const id = interaction.fields.getTextInputValue('input_id');
+    // -----------------------------------------------
+    // 2. SISTEMA DE BATE-PONTO (BOTÕES)
+    // -----------------------------------------------
+    if (interaction.isButton()) {
+      const canalLogsPonto = guild ? guild.channels.cache.get(CONFIG.ID_CANAL_LOGS_PONTO) : null;
 
-  const novoApelido = `${nome} | ${id}`;
+      if (customId === 'btn_iniciar') {
+        if (sessoesPonto.has(userId)) {
+          return interaction.reply({ content: '⚠️ Você já possui um bate-ponto ativo neste momento!', ephemeral: true });
+        }
 
-  // Tenta mudar o apelido no servidor
-  try {
-    if (interaction.member.manageable) {
-      await interaction.member.setNickname(novoApelido);
-    }
-  } catch (err) {
-    console.log('Aviso: Não foi possível alterar o apelido (permissão ou dono do servidor).');
-  }
+        sessoesPonto.set(userId, {
+          status: 'ativo',
+          startTime: agora,
+          totalPauseMs: 0,
+          lastPauseStart: null
+        });
 
-  // Adicionar o cargo de Cidadão
-  const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
-  if (cargo) {
-    await interaction.member.roles.add(cargo);
-  }
-
-  // 📢 ENVIAR LOG PARA O CANAL DO DISCORD
-  await enviarLog(
-    interaction.guild,
-    '📋 Novo Registro Realizado',
-    `**Membro:** ${interaction.user} (${interaction.user.tag})\n**Nome no Jogo:** ${nome}\n**ID:** ${id}\n**Novo Apelido:** \`${novoApelido}\``,
-    0x0099FF
-  );
-
-  await interaction.editReply({
-    content: `✅ Registro concluído com sucesso! Bem-vindo(a), **${novoApelido}**.`
-  });
-}
-
-  } catch (error) {
-    console.error('❌ Erro na interação de registro:', error);
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ 
-        content: '❌ Ocorreu um erro ao abrir o formulário de registro.', 
-        ephemeral: true 
-      }).catch(() => {});
-    }
-  }
-});
-
-// ==========================================
-// ENVIAR PAINEL AUTOMATICAMENTE AO LIGAR
-// ==========================================
-// ==========================================
-// ENVIAR PAINEL AUTOMATICAMENTE (SEM FLOOD)
-// ==========================================
-client.once('ready', async () => {
-  console.log(`Bot online como ${client.user.tag}!`);
-
-  // Substitui pelo ID real do teu canal de registro
-  const canalRegistro = client.channels.cache.get('1562603191324115091');
-
-  if (canalRegistro) {
-    try {
-      // 1. Procura e apaga as mensagens antigas enviadas pelo bot no canal para evitar flood
-      const mensagens = await canalRegistro.messages.fetch({ limit: 10 });
-      const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
-      
-      if (mensagensDoBot.size > 0) {
-        await canalRegistro.bulkDelete(mensagensDoBot);
+        return interaction.reply({ content: `🟢 **Ponto iniciado com sucesso!** Horário: <t:${Math.floor(agora.getTime() / 1000)}:T>`, ephemeral: true });
       }
 
-      // 2. Envia apenas uma nova mensagem limpa com o botão
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('btn_abrir_registro')
-          .setLabel('Registrar-se')
-          .setStyle(ButtonStyle.Success)
-      );
+      if (customId === 'btn_pausar') {
+        const sessao = sessoesPonto.get(userId);
+        if (!sessao) return interaction.reply({ content: '❌ Você ainda não iniciou um bate-ponto!', ephemeral: true });
+        if (sessao.status === 'pausado') return interaction.reply({ content: '⚠️ Seu bate-ponto já está pausado!', ephemeral: true });
 
-      await canalRegistro.send({
-        content: '📋 **REGISTRO DE CIDADÃO**\n\nClica no botão abaixo para preencher o teu Nome e ID e liberar o teu acesso ao servidor!',
-        components: [row]
-      });
-    } catch (error) {
-      console.error('Erro ao limpar/enviar painel de registro:', error);
+        sessao.status = 'pausado';
+        sessao.lastPauseStart = agora;
+        return interaction.reply({ content: `🟡 **Pausa iniciada!** Seu tempo está congelado até o retorno.`, ephemeral: true });
+      }
+
+      if (customId === 'btn_retornar') {
+        const sessao = sessoesPonto.get(userId);
+        if (!sessao) return interaction.reply({ content: '❌ Você ainda não iniciou um bate-ponto!', ephemeral: true });
+        if (sessao.status === 'ativo') return interaction.reply({ content: '⚠️ Seu bate-ponto já está em andamento!', ephemeral: true });
+
+        const duracaoPausa = agora.getTime() - sessao.lastPauseStart.getTime();
+        sessao.totalPauseMs += duracaoPausa;
+        sessao.lastPauseStart = null;
+        sessao.status = 'ativo';
+
+        return interaction.reply({ content: `🔵 **Retorno confirmado!** Seu tempo de trabalho voltou a ser contado.`, ephemeral: true });
+      }
+
+      if (customId === 'btn_encerrar') {
+        const sessao = sessoesPonto.get(userId);
+        if (!sessao) return interaction.reply({ content: '❌ Você não tem nenhum bate-ponto aberto para encerrar.', ephemeral: true });
+
+        if (sessao.status === 'pausado' && sessao.lastPauseStart) {
+          sessao.totalPauseMs += (agora.getTime() - sessao.lastPauseStart.getTime());
+        }
+
+        const duracaoTotalMs = agora.getTime() - sessao.startTime.getTime();
+        const tempoEfetivoMs = Math.max(0, duracaoTotalMs - sessao.totalPauseMs);
+
+        const totalSegundos = Math.floor(tempoEfetivoMs / 1000);
+        const horas = Math.floor(totalSegundos / 3600);
+        const minutos = Math.floor((totalSegundos % 3600) / 60);
+        const segundos = totalSegundos % 60;
+        const tempoFormatado = `${horas}h ${minutos}m ${segundos}s`;
+
+        sessoesPonto.delete(userId);
+
+        await interaction.reply({ content: `🔴 **Ponto encerrado!** Seu tempo total trabalhado foi de **${tempoFormatado}**.`, ephemeral: true });
+
+        if (canalLogsPonto) {
+          const embedLogPonto = new EmbedBuilder()
+            .setTitle('📋 **REGISTRO DE BATE-PONTO**')
+            .setColor('#e74c3c')
+            .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+            .addFields(
+              { name: '👤 Colaborador', value: `${user} (\`${user.id}\`)`, inline: true },
+              { name: '⏱️ Tempo Trabalhado', value: `\`${tempoFormatado}\``, inline: true },
+              { name: '🕒 Entrada', value: `<t:${Math.floor(sessao.startTime.getTime() / 1000)}:f>`, inline: false },
+              { name: '🛑 Saída', value: `<t:${Math.floor(agora.getTime() / 1000)}:f>`, inline: false }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Logs de Ponto', iconURL: guild ? guild.iconURL() : null });
+
+          await canalLogsPonto.send({ embeds: [embedLogPonto] });
+        }
+      }
     }
+
+  } catch (error) {
+    console.error('❌ Erro na interação geral:', error);
   }
 });
 
-// Login do Bot
-client.login(process.env.DISCORD_TOKEN)
-
-// Podes colar esta parte bem no final de tudo do teu index.js
-const ID_CANAL_LOGS = '1562603191324115092'; 
-
-async function enviarLog(guild, titulo, descricao, cor = 0x00FF00) {
+// ===================================================
+// FUNÇÃO AUXILIAR DE LOGS DO REGISTRO
+// ===================================================
+async function enviarLogRegistro(guild, titulo, descricao, cor = 0x00FF00) {
   try {
-    const canalLogs = await guild.channels.fetch(ID_CANAL_LOGS).catch(() => null);
-    if (!canalLogs) return;
+    const canalLogs = await guild.channels.fetch(ID_CANAL_LOGS_REGISTRO).catch(() => null);
+    if (!canalLogs) {
+      console.log("❌ ERRO NO LOG: Canal de logs de registro não foi encontrado!");
+      return;
+    }
 
     const embedLog = new EmbedBuilder()
       .setTitle(titulo)
@@ -513,6 +316,9 @@ async function enviarLog(guild, titulo, descricao, cor = 0x00FF00) {
 
     await canalLogs.send({ embeds: [embedLog] });
   } catch (error) {
-    console.error('Erro ao enviar log:', error);
+    console.error('❌ Erro ao enviar log de registro:', error);
   }
 }
+
+// Login do Bot
+client.login(process.env.DISCORD_TOKEN);
