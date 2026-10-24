@@ -322,3 +322,29 @@ async function enviarLogRegistro(guild, titulo, descricao, cor = 0x00FF00) {
 
 // Login do Bot
 client.login(process.env.DISCORD_TOKEN);
+
+
+// ==========================================
+// BOAS-VINDAS AUTOMÁTICAS
+// ==========================================
+const ID_CANAL_BEM_VINDO = '1562603191324115087';
+
+client.on('guildMemberAdd', (member) => {
+  const canal = member.guild.channels.cache.get(ID_CANAL_BEM_VINDO);
+  if (!canal) return;
+
+  canal.send(`👋 Olá ${member}, sê muito bem-vindo(a) ao **${member.guild.name}**! Não te esqueças de ir ao canal de registro para liberar o teu acesso.`);
+});
+
+
+// ==========================================
+// AVISO DE SAÍDA DE MEMBROS
+// ==========================================
+const ID_CANAL_SAIDA = '1562603191324115088'; // Substitui pelo ID do canal onde quieres que o aviso apareça
+
+client.on('guildMemberRemove', (member) => {
+  const canal = member.guild.channels.cache.get(ID_CANAL_SAIDA);
+  if (!canal) return;
+
+  canal.send(`📤 **${member.user.tag}** saiu do servidor.`);
+});
