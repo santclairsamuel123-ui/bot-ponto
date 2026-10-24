@@ -242,7 +242,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Login do Bot
-client.login("MTU2MzE1NTAwMDMwODI3NzM3OQ.GvuRrR.n3phAMU_epGkSDTn6r7pGFZp7Pby_rhmtrZ-eU");
+client.login("MTU2MzE1NTAwMDMwODI3NzM3OQ.GRoEiD.e-XpFU2epJIPNXOhujGGvPtEGoLapI14EZOHtg");
 
 
 // ==========================================
@@ -332,4 +332,4 @@ client.once('ready', async () => {
 // ==========================================
 // LOGIN DO BOT
 // ==========================================
-client.login("MTU2MzE1NTAwMDMwODI3NzM3OQ.GvuRrR.n3phAMU_epGkSDTn6r7pGFZp7Pby_rhmtrZ-eU");
+client.login(process.env.DISCORD_TOKEN);
