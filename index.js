@@ -25,10 +25,9 @@ app.listen(PORT, () => {
 // CONFIGURAÇÕES DO SEU BOT
 // ===================================================
 const CONFIG = {
-  TOKEN: process.env.DISCORD_TOKEN || 'MTU2MzE1NTAwMDMwODI3NzM3OQ.Gfe8XV.XSX6NNYtqOqGfe0jEaWQtNQ6tGI2l_wG4OIliQ', // Recomenda-se colocar um novo token aqui
-  ID_CANAL_LOGS: '1563319588614045776',                     // ID do canal onde as logs de ponto serão enviadas
-  BANNER_URL: 'https://i.imgur.com/4F7hNnz.png',            // URL da imagem/banner da sua organização
-  COR_EMBED: '#2b2d31'                                       // Cor hexadecimal da mensagem
+  ID_CANAL_LOGS: '1563319588614045776',
+  BANNER_URL: 'https://i.imgur.com/4F7hNnz.png',
+  COR_EMBED: '#2b2d31'
 };
 
 // Objeto para armazenar as sessões de bate-ponto ativas em memória
@@ -243,4 +242,4 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Login do Bot
-client.login(CONFIG.TOKEN);
+client.login(process.env.DISCORD_TOKEN);
