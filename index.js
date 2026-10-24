@@ -25,14 +25,13 @@ app.listen(PORT, () => {
 // CONFIGURAÇÕES DO SEU BOT
 // ===================================================
 const CONFIG = {
-  TOKEN: 'MTU2MzE1NTAwMDMwODI3NzM3OQ.Gu_Z0d.aTHykmfTbTED-aGSRMOrzZHUxupRrcyDnJEvT8',                   // Token do seu bot do Discord
-  ID_CANAL_LOGS: '1563319588614045776',      // ID do canal onde as logs de ponto serão enviadas
-  BANNER_URL: 'https://i.imgur.com/4F7hNnz.png',     // URL da imagem/banner da sua organização
-  COR_EMBED: '#2b2d31'                        // Cor hexadecimal da mensagem (padrão escuro do Discord)
+  TOKEN: process.env.DISCORD_TOKEN || 'MTU2MzE1NTAwMDMwODI3NzM3OQ.Gfe8XV.XSX6NNYtqOqGfe0jEaWQtNQ6tGI2l_wG4OIliQ', // Recomenda-se colocar um novo token aqui
+  ID_CANAL_LOGS: '1563319588614045776',                     // ID do canal onde as logs de ponto serão enviadas
+  BANNER_URL: 'https://i.imgur.com/4F7hNnz.png',            // URL da imagem/banner da sua organização
+  COR_EMBED: '#2b2d31'                                       // Cor hexadecimal da mensagem
 };
 
 // Objeto para armazenar as sessões de bate-ponto ativas em memória
-// Estrutura: { [userID]: { status: 'ativo'|'pausado', startTime: Date, totalPauseMs: number, lastPauseStart: Date|null } }
 const sessoesPonto = new Map();
 
 const client = new Client({
@@ -47,15 +46,14 @@ client.once('ready', () => {
   console.log(`✅ Bot online como ${client.user.tag}!`);
 });
 
-// Comando de Prefixo para Painel e Configuração: "!ponto"
+// Comando de Prefixo para Painel: "!ponto"
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  // Comando !ponto - Apenas o Dono do Servidor (Owner) pode executar
   if (message.content === '!ponto') {
-    // Substitui O_TEU_ID_AQUI pelo número do teu ID (exemplo: '123456789012345678')
+    // Permissão para o criador do bot
     if (message.author.id !== '840326310701432854') {
-        return message.reply('❌ **Acesso negado:** Apenas o meu criador tem permissão para usar este comando.');
+      return message.reply('❌ **Acesso negado:** Apenas o meu criador tem permissão para usar este comando.');
     }
 
     // Painel Principal de Bate-Ponto
@@ -71,7 +69,7 @@ client.on('messageCreate', async (message) => {
       )
       .setColor(CONFIG.COR_EMBED)
       .setImage(CONFIG.BANNER_URL)
-      .setFooter({ text: 'Sistema Oficial de Ponto • Registro automatizado', iconURL: message.guild.iconURL() });
+      .setFooter({ text: 'Sistema Oficial de Ponto • Registro automatizado', iconURL: message.guild ? message.guild.iconURL() : null });
 
     // Botões Interativos
     const botoes = new ActionRowBuilder().addComponents(
@@ -98,7 +96,7 @@ client.on('messageCreate', async (message) => {
     );
 
     await message.channel.send({ embeds: [embedPainel], components: [botoes] });
-    await message.delete().catch(() => {}); // Deleta a mensagem do comando !ponto
+    await message.delete().catch(() => {});
   }
 });
 
@@ -110,12 +108,9 @@ client.on('interactionCreate', async (interaction) => {
   const userId = user.id;
   const agora = new Date();
 
-  // Canal de Logs
-  const canalLogs = guild.channels.cache.get(CONFIG.ID_CANAL_LOGS);
+  const canalLogs = guild ? guild.channels.cache.get(CONFIG.ID_CANAL_LOGS) : null;
 
-  // ---------------------------------------------------
   // 🟢 INICIAR BATE-PONTO
-  // ---------------------------------------------------
   if (customId === 'btn_iniciar') {
     if (sessoesPonto.has(userId)) {
       return interaction.reply({
@@ -137,9 +132,7 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  // ---------------------------------------------------
   // 🟡 PAUSAR BATE-PONTO
-  // ---------------------------------------------------
   else if (customId === 'btn_pausar') {
     const sessao = sessoesPonto.get(userId);
 
@@ -166,9 +159,7 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  // ---------------------------------------------------
   // 🔵 RETORNAR DA PAUSA
-  // ---------------------------------------------------
   else if (customId === 'btn_retornar') {
     const sessao = sessoesPonto.get(userId);
 
@@ -186,7 +177,6 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
-    // Calcula quanto tempo durou a pausa e adiciona ao total de pausas
     const duracaoPausa = agora.getTime() - sessao.lastPauseStart.getTime();
     sessao.totalPauseMs += duracaoPausa;
     sessao.lastPauseStart = null;
@@ -198,9 +188,7 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  // ---------------------------------------------------
   // 🔴 ENCERRAR BATE-PONTO E GERAR LOG
-  // ---------------------------------------------------
   else if (customId === 'btn_encerrar') {
     const sessao = sessoesPonto.get(userId);
 
@@ -211,16 +199,13 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
-    // Se encerrou enquanto estava pausado, encerra a pausa corrente
     if (sessao.status === 'pausado' && sessao.lastPauseStart) {
       sessao.totalPauseMs += (agora.getTime() - sessao.lastPauseStart.getTime());
     }
 
-    // Tempo total decorrido descontando as pausas
     const duracaoTotalMs = agora.getTime() - sessao.startTime.getTime();
     const tempoEfetivoMs = Math.max(0, duracaoTotalMs - sessao.totalPauseMs);
 
-    // Formatação de Horas, Minutos e Segundos
     const totalSegundos = Math.floor(tempoEfetivoMs / 1000);
     const horas = Math.floor(totalSegundos / 3600);
     const minutos = Math.floor((totalSegundos % 3600) / 60);
@@ -228,7 +213,6 @@ client.on('interactionCreate', async (interaction) => {
 
     const tempoFormatado = `${horas}h ${minutos}m ${segundos}s`;
 
-    // Deleta a sessão do usuário
     sessoesPonto.delete(userId);
 
     await interaction.reply({
@@ -236,7 +220,7 @@ client.on('interactionCreate', async (interaction) => {
       ephemeral: true
     });
 
-    // Enviar Log para o Canal de Logs
+    // Enviar Log
     if (canalLogs) {
       const embedLog = new EmbedBuilder()
         .setTitle('📋 **REGISTRO DE BATE-PONTO**')
@@ -249,7 +233,7 @@ client.on('interactionCreate', async (interaction) => {
           { name: '🛑 Saída', value: `<t:${Math.floor(agora.getTime() / 1000)}:f>`, inline: false }
         )
         .setTimestamp()
-        .setFooter({ text: 'Logs de Ponto', iconURL: guild.iconURL() });
+        .setFooter({ text: 'Logs de Ponto', iconURL: guild ? guild.iconURL() : null });
 
       await canalLogs.send({ embeds: [embedLog] });
     } else {
