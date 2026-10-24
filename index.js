@@ -248,61 +248,200 @@ client.login(process.env.DISCORD_TOKEN);
 // ==========================================
 // SISTEMA DE REGISTRO
 // ==========================================
-const CARGO_CIDADAO_ID = '1562603190653026352'; // Subtitua pelo ID do cargo no Discord
+// ==========================================
+// SISTEMA DE REGISTRO - RESPOSTA AOS BOTÕES E MODAL
+// ==========================================
 
 client.on('interactionCreate', async (interaction) => {
+  try {
+    // 1. QUANDO O USUÁRIO CLICA NO BOTÃO "REGISTRAR-SE"
+    if (interaction.isButton() && interaction.customId === 'btn_abrir_registro') {
+      console.log(`[REGISTRO] Botão clicado por: ${interaction.user.tag}`);
 
-  // 1. Abrir o formulário ao clicar no botão
-  if (interaction.isButton() && interaction.customId === 'btn_abrir_registro') {
-    const modal = new ModalBuilder()
-      .setCustomId('modal_registro')
-      .setTitle('Registro de Cidadão');
+      // Cria o formulário (Modal)
+      const modal = new ModalBuilder()
+        .setCustomId('modal_registro')
+        .setTitle('Registro de Cidadão');
 
-    const inputNome = new TextInputBuilder()
-      .setCustomId('input_nome')
-      .setLabel('Seu Nome no Jogo')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: João Silva')
-      .setRequired(true);
+      // Campo 1: Nome no Jogo
+      const inputNome = new TextInputBuilder()
+        .setCustomId('input_nome')
+        .setLabel('Seu Nome no Jogo')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: João Silva')
+        .setRequired(true);
 
-    const inputID = new TextInputBuilder()
-      .setCustomId('input_id')
-      .setLabel('Seu ID no Jogo')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 1234')
-      .setRequired(true);
+      // Campo 2: ID no Jogo
+      const inputID = new TextInputBuilder()
+        .setCustomId('input_id')
+        .setLabel('Seu ID no Jogo')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: 1234')
+        .setRequired(true);
 
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(inputNome),
-      new ActionRowBuilder().addComponents(inputID)
-    );
+      const primeiraLinha = new ActionRowBuilder().addComponents(inputNome);
+      const segundaLinha = new ActionRowBuilder().addComponents(inputID);
 
-    await interaction.showModal(modal);
+      modal.addComponents(primeiraLinha, segundaLinha);
+
+      // Exibe o formulário imediatamente para o usuário
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // 2. QUANDO O USUÁRIO ENVIA O FORMULÁRIO PREENCHIDO
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
+      // Adia a resposta para evitar timeout de 3 segundos
+      await interaction.deferReply({ ephemeral: true });
+
+      const nome = interaction.fields.getTextInputValue('input_nome');
+      const id = interaction.fields.getTextInputValue('input_id');
+
+      const novoApelido = `${nome} | ${id}`;
+
+      // Tenta mudar o apelido no servidor
+      try {
+        if (interaction.member.manageable) {
+          await interaction.member.setNickname(novoApelido);
+        }
+      } catch (err) {
+        console.log('Aviso: Não foi possível alterar o apelido (permissão ou dono do servidor).');
+      }
+
+      // Adiciona o cargo de Cidadão
+      const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
+      if (cargo) {
+        await interaction.member.roles.add(cargo);
+      }
+
+      // Confirma para o usuário
+      await interaction.editReply({
+        content: `✅ **Registro concluído com sucesso!**\n\n**Nome/ID definido:** ${novoApelido}`
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Erro na interação de registro:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ 
+        content: '❌ Ocorreu um erro ao abrir o formulário de registro.', 
+        ephemeral: true 
+      }).catch(() => {});
+    }
   }
+});
 
   // 2. Processar o formulário preenchido
-  if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
-    const nome = interaction.fields.getTextInputValue('input_nome');
-    const idJogo = interaction.fields.getTextInputValue('input_id');
+  // ==========================================
+// SISTEMA DE REGISTRO - RESPOSTA AOS BOTÕES E MODAL
+// ==========================================
 
-    const novoApelido = `${nome} | ${idJogo}`;
+// ID do cargo que o membro vai receber após se registrar
+const CARGO_CIDADAO_ID = '1562603190653026352'; 
 
-    try {
-      const membro = interaction.member;
+client.on('interactionCreate', async (interaction) => {
+  try {
+    // ==========================================
+// INTERAÇÃO DO BOTÃO E FORMULÁRIO DE REGISTRO
+// ==========================================
+client.on('interactionCreate', async (interaction) => {
+  try {
+    // 1. QUANDO CLICA NO BOTÃO "REGISTRAR-SE"
+    if (interaction.isButton() && interaction.customId === 'btn_abrir_registro') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_registro')
+        .setTitle('Registro de Cidadão');
 
-      await membro.setNickname(novoApelido);
-      await membro.roles.add(CARGO_CIDADAO_ID);
+      const inputNome = new TextInputBuilder()
+        .setCustomId('input_nome')
+        .setLabel('Seu Nome no Jogo')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: João Silva')
+        .setRequired(true);
 
-      await interaction.reply({
-        content: `✅ Registro concluído com sucesso! Bem-vindo(a), **${novoApelido}**.`,
-        flags: MessageFlags.Ephemeral
+      const inputID = new TextInputBuilder()
+        .setCustomId('input_id')
+        .setLabel('Seu ID no Jogo')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: 1234')
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(inputNome),
+        new ActionRowBuilder().addComponents(inputID)
+      );
+
+      // ABRIR O FORMULÁRIO NA HORA
+      return await interaction.showModal(modal);
+    }
+
+    // 2. QUANDO ENVIA O FORMULÁRIO PREENCHIDO
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const nome = interaction.fields.getTextInputValue('input_nome');
+      const idJogo = interaction.fields.getTextInputValue('input_id');
+      const novoApelido = `${nome} | ${idJogo}`;
+
+      // Alterar Apelido
+      try {
+        await interaction.member.setNickname(novoApelido);
+      } catch (err) {
+        console.log('Não foi possível alterar apelido (permissão ou dono).');
+      }
+
+      // Adicionar Cargo
+      const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
+      if (cargo) {
+        await interaction.member.roles.add(cargo);
+      }
+
+      await interaction.editReply({
+        content: `✅ Registro concluído com sucesso! Bem-vindo(a), **${novoApelido}**.`
       });
-    } catch (error) {
-      console.error('Erro no registro:', error);
-      await interaction.reply({
-        content: '❌ Erro ao registrar. Verifique se o meu cargo está acima do cargo Cidadão nas configurações do servidor.',
-        flags: MessageFlags.Ephemeral
+    }
+  } catch (error) {
+    console.error('Erro na interação:', error);
+  }
+});
+    // 2. QUANDO O USUÁRIO ENVIA O FORMULÁRIO PREENCHIDO
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
+      // Adia a resposta para evitar timeout de 3 segundos
+      await interaction.deferReply({ ephemeral: true });
+
+      const nome = interaction.fields.getTextInputValue('input_nome');
+      const id = interaction.fields.getTextInputValue('input_id');
+
+      const novoApelido = `${nome} | ${id}`;
+
+      // Tenta mudar o apelido no servidor
+      try {
+        if (interaction.member.manageable) {
+          await interaction.member.setNickname(novoApelido);
+        }
+      } catch (err) {
+        console.log('Aviso: Não foi possível alterar o apelido (permissão ou dono do servidor).');
+      }
+
+      // Adiciona o cargo de Cidadão
+      const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
+      if (cargo) {
+        await interaction.member.roles.add(cargo);
+      }
+
+      // Confirma para o usuário
+      await interaction.editReply({
+        content: `✅ **Registro concluído com sucesso!**\n\n**Nome/ID definido:** ${novoApelido}`
       });
+    }
+
+  } catch (error) {
+    console.error('❌ Erro na interação de registro:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ 
+        content: '❌ Ocorreu um erro ao abrir o formulário de registro.', 
+        ephemeral: true 
+      }).catch(() => {});
     }
   }
 });
@@ -348,4 +487,4 @@ client.once('ready', async () => {
 });
 
 // Login do Bot
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN)
