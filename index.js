@@ -352,12 +352,12 @@ client.on('guildMemberRemove', (member) => {
 
 
 // ===================================================
-// SISTEMA DE RECRUTAMENTO DA FACÇÃO
+// SISTEMA DE RECRUTAMENTO POR THREAD PRIVADA (15 PERGUNTAS)
 // ===================================================
 const ID_CANAL_PAINEL_RECRUTAMENTO = '1562603191625977900';
 const ID_CANAL_LOGS_RECRUTAMENTO = '1563928804290986165';
 
-// 1. Enviar o painel de recrutamento automaticamente ao ligar (sem flood)
+// 1. Enviar o painel de recrutamento automaticamente ao ligar
 client.once('ready', async () => {
   const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
   if (canalRecrutamento) {
@@ -371,125 +371,126 @@ client.once('ready', async () => {
 
       const rowRecrutamento = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId('btn_abrir_recrutamento')
+          .setCustomId('btn_abrir_recrutamento_thread')
           .setLabel('Fazer Recrutamento')
           .setStyle(ButtonStyle.Primary)
           .setEmoji('📝')
       );
 
       await canalRecrutamento.send({
-        content: '⚔️ **RECRUTAMENTO DA FACÇÃO**\n\nClica no botão abaixo para preencher o formulário de recrutamento. As tuas respostas serão enviadas diretamente para a nossa liderança!',
+        content: '⚔️ **RECRUTAMENTO DA FACÇÃO**\n\nClica no botão abaixo para abrir o teu canal de recrutamento privado e responder às perguntas com calma!',
         components: [rowRecrutamento]
       });
     } catch (error) {
-      console.error('Erro ao limpar/enviar painel de recrutamento:', error);
+      console.error('Erro ao enviar painel de recrutamento:', error);
     }
   }
 });
 
-// 2. Manipulador das interações (Botão e Envio do Modal)
+// 2. Manipulador do Botão para criar a Thread Privada
 client.on('interactionCreate', async (interaction) => {
   try {
-    const { customId, user, guild } = interaction;
+    const { customId, user, guild, channel } = interaction;
 
-    // Quando clica no botão "Fazer Recrutamento"
-    if (interaction.isButton() && customId === 'btn_abrir_recrutamento') {
-      const modal = new ModalBuilder()
-        .setCustomId('modal_recrutamento')
-        .setTitle('Formulário de Recrutamento');
-
-      // Campo 1 (Perguntas 1 e 2)
-      const q1 = new TextInputBuilder()
-        .setCustomId('rec_p1')
-        .setLabel('1. O que é Roleplay e Anti-Roleplay?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Explique com as suas palavras...')
-        .setRequired(true);
-
-      // Campo 2 (Perguntas 3 e 4)
-      const q2 = new TextInputBuilder()
-        .setCustomId('rec_p2')
-        .setLabel('2. O que são RDM e VDM?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Explique os dois conceitos...')
-        .setRequired(true);
-
-      // Campo 3 (Perguntas 5 e 6)
-      const q3 = new TextInputBuilder()
-        .setCustomId('rec_p3')
-        .setLabel('3. O que são Ghost-Gaming e Meta-Gaming?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Explique os dois conceitos...')
-        .setRequired(true);
-
-      // Campo 4 (Pergunta 7)
-      const q4 = new TextInputBuilder()
-        .setCustomId('rec_p4')
-        .setLabel('4. O que é PowerGaming? Explique.')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Explique detalhadamente...')
-        .setRequired(true);
-
-      // Campo 5 (Perguntas 8 e 9)
-      const q5 = new TextInputBuilder()
-        .setCustomId('rec_p5')
-        .setLabel('5. O que significam ICC e OOC?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Explique as duas siglas...')
-        .setRequired(true);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(q1),
-        new ActionRowBuilder().addComponents(q2),
-        new ActionRowBuilder().addComponents(q3),
-        new ActionRowBuilder().addComponents(q4),
-        new ActionRowBuilder().addComponents(q5)
-      );
-
-      return await interaction.showModal(modal);
-    }
-
-    // Quando envia o formulário preenchido
-    if (interaction.isModalSubmit() && customId === 'modal_recrutamento') {
+    if (interaction.isButton() && customId === 'btn_abrir_recrutamento_thread') {
       await interaction.deferReply({ ephemeral: true });
 
-      const resp1 = interaction.fields.getTextInputValue('rec_p1');
-      const resp2 = interaction.fields.getTextInputValue('rec_p2');
-      const resp3 = interaction.fields.getTextInputValue('rec_p3');
-      const resp4 = interaction.fields.getTextInputValue('rec_p4');
-      const resp5 = interaction.fields.getTextInputValue('rec_p5');
+      // Cria uma thread privada no canal do painel
+      const thread = await channel.threads.create({
+        name: `recrutamento-${user.username}`,
+        autoArchiveDuration: 60,
+        type: ChannelType.GuildPrivateThread,
+        reason: `Formulário de recrutamento de ${user.tag}`
+      });
+
+      // Adiciona o utilizador à thread privada
+      await thread.members.add(user.id);
+
+      // Envia as instruções e as 15 perguntas lá dentro
+      await thread.send({
+        content: `👋 Olá ${user}! Bem-vindo ao teu canal de recrutamento privado.\n\nPor favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui em baixo (podes responder todas numa única mensagem bem estruturada ou enviar em várias mensagens):\n\n` +
+          `1️⃣ O que é Roleplay?\n` +
+          `2️⃣ O que é Anti-Roleplay? Explique.\n` +
+          `3️⃣ O que é RDM?\n` +
+          `4️⃣ O que é VDM?\n` +
+          `5️⃣ O que é ghost-gaming?\n` +
+          `6️⃣ O que é meta-gaming? Explique.\n` +
+          `7️⃣ O que é PowerGaming? Explique.\n` +
+          `8️⃣ O que é ICC?\n` +
+          `9️⃣ O que é OOC?\n` +
+          `🔟 O que é Combat-Logging?\n` +
+          `1️⃣1️⃣ O que é DVR?\n` +
+          `1️⃣2️⃣ O que é Dark-RP?\n` +
+          `1️⃣3️⃣ Se um player cometer um Anti-RP contigo, o que deverias fazer?\n` +
+          `1️⃣4️⃣ Estás disposto a seguir as regras da nossa facção e do servidor? Aceitarias levar punições ou advertências quando fizeres algo errado na facção?\n` +
+          `1️⃣5️⃣ O seu edital foi realizado com sucesso! Responda apenas "TDT", envie e aguarde o resultado.\n\n` +
+          `⚠️ *Quando terminares de responder a todas, clica no botão abaixo para finalizar e enviar para a liderança!*`,
+        components: [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`concluir_rec_${user.id}`)
+              .setLabel('Enviar Respostas')
+              .setStyle(ButtonStyle.Success)
+              .setEmoji('✅')
+          )
+        ]
+      });
+
+      return await interaction.editReply({
+        content: `✅ O teu canal privado de recrutamento foi aberto com sucesso! Clica aqui para aceder: ${thread}`
+      });
+    }
+
+    // 3. Quando o candidato clica em "Enviar Respostas" na Thread
+    if (interaction.isButton() && customId.startsWith('concluir_rec_')) {
+      const userId = customId.split('_')[2];
+      
+      if (user.id !== userId) {
+        return await interaction.reply({ content: '❌ Apenas o candidato pode finalizar este recrutamento.', ephemeral: true });
+      }
+
+      await interaction.deferUpdate();
+
+      // Busca as mensagens enviadas pelo candidato na thread
+      const mensagensThread = await interaction.channel.messages.fetch({ limit: 100 });
+      const mensagensUsuario = mensagensThread.filter(m => m.author.id === userId && !m.author.bot);
+
+      let respostasTexto = mensagensUsuario.map(m => m.content).reverse().join('\n\n--- Resposta Seguinte ---\n\n');
+      if (!respostasTexto) respostasTexto = 'Nenhuma resposta detalhada enviada.';
 
       const canalLogsRecrutamento = guild ? guild.channels.cache.get(ID_CANAL_LOGS_RECRUTAMENTO) : null;
 
       if (canalLogsRecrutamento) {
         const embedRecrutamento = new EmbedBuilder()
-          .setTitle('📥 **NOVA CANDIDATURA DE RECRUTAMENTO**')
-          .setColor('#9b59b6')
+          .setTitle('📥 **NOVA CANDIDATURA DE RECRUTAMENTO (15 PERGUNTAS)**')
+          .setColor('#2ecc71')
           .setThumbnail(user.displayAvatarURL({ dynamic: true }))
           .addFields(
             { name: '👤 Candidato', value: `${user} (\`${user.id}\`)`, inline: false },
-            { name: '1️⃣ O que é Roleplay e Anti-Roleplay?', value: resp1, inline: false },
-            { name: '2️⃣ O que são RDM e VDM?', value: resp2, inline: false },
-            { name: '3️⃣ O que são Ghost-Gaming e Meta-Gaming?', value: resp3, inline: false },
-            { name: '4️⃣ O que é PowerGaming?', value: resp4, inline: false },
-            { name: '5️⃣ O que significam ICC e OOC?', value: resp5, inline: false }
+            { name: '📝 Respostas Coletadas', value: respostasTexto.length > 1024 ? respostasTexto.substring(0, 1021) + '...' : respostasTexto, inline: false }
           )
-          .setFooter({ text: 'Sistema de Recrutamento', iconURL: guild ? guild.iconURL() : null })
+          .setFooter({ text: 'Sistema de Recrutamento por Thread Privada', iconURL: guild ? guild.iconURL() : null })
           .setTimestamp();
 
-        // Envia a log no canal privado marcando o player
         await canalLogsRecrutamento.send({
-          content: `🔔 **Nova submissão recebida de ${user}!**`,
+          content: `🔔 **Nova candidatura concluída por ${user}!**`,
           embeds: [embedRecrutamento]
         });
       }
 
-      await interaction.editReply({
-        content: '✅ **Formulário enviado com sucesso!** As tuas respostas foram encaminhadas para a liderança.'
-      });
+      await interaction.channel.send('✅ **Formulário enviado com sucesso para a liderança!** Este canal privado será encerrado em breve.');
+      
+      // Apaga a thread após 5 segundos
+      setTimeout(async () => {
+        try {
+          await interaction.channel.delete();
+        } catch (e) {
+          console.error('Erro ao apagar thread:', e);
+        }
+      }, 5000);
     }
 
   } catch (error) {
-    console.error('❌ Erro no sistema de recrutamento:', error);
+    console.error('❌ Erro no sistema de recrutamento por thread:', error);
   }
 });
