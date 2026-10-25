@@ -353,12 +353,34 @@ client.on('guildMemberRemove', (member) => {
 
 
 // ===================================================
-// SISTEMA DE RECRUTAMENTO POR THREAD PRIVADA (15 PERGUNTAS)
+// SISTEMA DE RECRUTAMENTO PASSO A PASSO (15 PERGUNTAS)
 // ===================================================
 const ID_CANAL_PAINEL_RECRUTAMENTO = '1562603191625977900';
 const ID_CANAL_LOGS_RECRUTAMENTO = '1563928804290986165';
 
-// 1. Enviar e atualizar o painel de recrutamento ao ligar o bot
+// Lista com as 15 Perguntas
+const PERGUNTAS_RECRUTAMENTO = [
+  '1️⃣ O que é Roleplay?',
+  '2️⃣ O que é Anti-Roleplay? Explique.',
+  '3️⃣ O que é RDM?',
+  '4️⃣ O que é VDM?',
+  '5️⃣ O que é ghost-gaming?',
+  '6️⃣ O que é meta-gaming? Explique.',
+  '7️⃣ O que é PowerGaming? Explique.',
+  '8️⃣ O que é ICC?',
+  '9️⃣ O que é OOC?',
+  '🔟 O que é Combat-Logging?',
+  '1️⃣1️⃣ O que é DVR?',
+  '1️⃣2️⃣ O que é Dark-RP?',
+  '1️⃣3️⃣ Se um player cometer um Anti-RP contigo, o que deverias fazer?',
+  '1️⃣4️⃣ Estás disposto a seguir as regras da nossa facção e do servidor? Aceitarias levar punições ou advertências quando fizeres algo errado na facção?',
+  '1️⃣5️⃣ O seu edital foi realizado com sucesso! Responda apenas "TDT", envie e aguarde o resultado.'
+];
+
+// Guardar o progresso dos recrutamentos em memória
+const recrutamentosAtivos = new Map();
+
+// 1. Painel Inicial
 client.once('ready', async () => {
   const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
   if (canalRecrutamento) {
@@ -390,19 +412,16 @@ client.once('ready', async () => {
   }
 });
 
-// 2. Manipulador de Interações
+// 2. Criar a Thread Privada e Iniciar Pergunta 1
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
-  const { customId, user, guild, channel } = interaction;
+  const { customId, user, channel } = interaction;
 
-  // CLIQUE NO BOTÃO "FAZER RECRUTAMENTO"
   if (customId === 'btn_abrir_recrutamento_thread') {
     try {
-      // Responde imediatamente ao Discord (ephemeral = só o player vê)
       await interaction.deferReply({ ephemeral: true });
 
-      // Tenta criar a thread privada
       const thread = await channel.threads.create({
         name: `recrutamento-${user.username.replace(/[^a-zA-Z0-9]/g, '')}`,
         autoArchiveDuration: 60,
@@ -410,109 +429,103 @@ client.on('interactionCreate', async (interaction) => {
         reason: `Edital de Recrutamento da Turquia - ${user.tag}`
       });
 
-      // Adiciona o jogador à thread
       await thread.members.add(user.id);
 
-      // Envia as perguntas na thread privada
-      await thread.send({
-        content: `👋 Olá ${user}! Bem-vindo ao teu canal de recrutamento privado da **Turquia**.\n\n` +
-          `Por favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui no chat:\n\n` +
-          `1️⃣ O que é Roleplay?\n` +
-          `2️⃣ O que é Anti-Roleplay? Explique.\n` +
-          `3️⃣ O que é RDM?\n` +
-          `4️⃣ O que é VDM?\n` +
-          `5️⃣ O que é ghost-gaming?\n` +
-          `6️⃣ O que é meta-gaming? Explique.\n` +
-          `7️⃣ O que é PowerGaming? Explique.\n` +
-          `8️⃣ O que é ICC?\n` +
-          `9️⃣ O que é OOC?\n` +
-          `🔟 O que é Combat-Logging?\n` +
-          `1️⃣1️⃣ O que é DVR?\n` +
-          `1️⃣2️⃣ O que é Dark-RP?\n` +
-          `1️⃣3️⃣ Se um player cometer um Anti-RP contigo, o que deverias fazer?\n` +
-          `1️⃣4️⃣ Estás disposto a seguir as regras da nossa facção e do servidor? Aceitarias levar punições ou advertências quando fizeres algo errado na facção?\n` +
-          `1️⃣5️⃣ O seu edital foi realizado com sucesso! Responda apenas "TDT", envie e aguarde o resultado.\n\n` +
-          `⚠️ *Quando terminares de responder a todas, clica no botão abaixo para finalizar e enviar para a liderança!*`,
-        components: [
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId(`concluir_rec_${user.id}`)
-              .setLabel('Enviar Respostas')
-              .setStyle(ButtonStyle.Success)
-              .setEmoji('✅')
-          )
-        ]
+      // Regista a sessão de recrutamento do candidato
+      recrutamentosAtivos.set(thread.id, {
+        userId: user.id,
+        perguntaAtual: 0,
+        respostas: []
       });
 
-      // Confirma ao jogador
+      await thread.send(
+        `👋 Olá ${user}! Bem-vindo ao teu edital privado da **Turquia**.\n\n` +
+        `Vou enviar **uma pergunta de cada vez**. Responde no chat para avançar!\n\n` +
+        `📌 **Pergunta 1/15:**\n${PERGUNTAS_RECRUTAMENTO[0]}`
+      );
+
       return await interaction.editReply({
         content: `✅ O teu canal privado de recrutamento foi aberto com sucesso! Clica aqui para aceder: ${thread}`
       });
 
     } catch (error) {
-      console.error('❌ Erro ao criar recrutamento:', error);
-      
-      // Avisa o jogador do erro no Discord em vez de ficar "a pensar"
+      console.error('❌ Erro ao iniciar recrutamento:', error);
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply({
-          content: `❌ Ocorreu um erro ao abrir a tua sala de recrutamento. Garante que o bot tem permissão de **Criar Threads Privadas** neste canal! Error: \`${error.message}\``
+          content: `❌ Ocorreu um erro ao abrir a tua sala de recrutamento: \`${error.message}\``
         });
       }
     }
   }
+});
 
-  // CLIQUE NO BOTÃO "ENVIAR RESPOSTAS" DENTRO DA THREAD
-  if (customId.startsWith('concluir_rec_')) {
-    try {
-      const userId = customId.split('_')[2];
-      
-      if (user.id !== userId) {
-        return await interaction.reply({ 
-          content: '❌ Apenas o candidato pode finalizar este recrutamento.', 
-          ephemeral: true 
+// 3. Ouvir as Respostas do Candidato no Chat (Passo a Passo)
+client.on('messageCreate', async (message) => {
+  if (message.author.bot || !message.channel.isThread()) return;
+
+  const sessao = recrutamentosAtivos.get(message.channel.id);
+  if (!sessao) return;
+
+  // Garante que só o candidato responde
+  if (message.author.id !== sessao.userId) return;
+
+  // Salva a resposta da pergunta atual
+  sessao.respostas.push({
+    pergunta: PERGUNTAS_RECRUTAMENTO[sessao.perguntaAtual],
+    resposta: message.content
+  });
+
+  sessao.perguntaAtual++;
+
+  // Se ainda houver perguntas pendentes, envia a próxima
+  if (sessao.perguntaAtual < PERGUNTAS_RECRUTAMENTO.length) {
+    await message.channel.send(
+      `📌 **Pergunta ${sessao.perguntaAtual + 1}/15:**\n${PERGUNTAS_RECRUTAMENTO[sessao.perguntaAtual]}`
+    );
+  } else {
+    // FINALIZOU TODAS AS 15 PERGUNTAS!
+    await message.channel.send('✅ **Edital concluído com sucesso!** A compilar e enviar a tua ficha para a liderança...');
+
+    const guild = message.guild;
+    const canalLogs = guild ? guild.channels.cache.get(ID_CANAL_LOGS_RECRUTAMENTO) : null;
+
+    if (canalLogs) {
+      const embed = new EmbedBuilder()
+        .setTitle('📥 **NOVA CANDIDATURA - EDITAL DA TURQUIA**')
+        .setColor('#e74c3c')
+        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: '👤 Candidato', value: `${message.author} (\`${message.author.id}\`)`, inline: false }
+        )
+        .setFooter({ text: 'Sistema de Recrutamento Passo a Passo - Turquia', iconURL: guild ? guild.iconURL() : null })
+        .setTimestamp();
+
+      // Formata as 15 perguntas e respostas
+      sessao.respostas.forEach((item, index) => {
+        embed.addFields({
+          name: `${item.pergunta}`,
+          value: item.resposta.length > 1024 ? item.resposta.substring(0, 1021) + '...' : item.resposta,
+          inline: false
         });
-      }
+      });
 
-      await interaction.deferUpdate();
-
-      const mensagensThread = await channel.messages.fetch({ limit: 100 });
-      const mensagensUsuario = mensagensThread.filter(m => m.author.id === userId && !m.author.bot);
-
-      let respostasTexto = mensagensUsuario.map(m => m.content).reverse().join('\n\n--- Resposta Seguinte ---\n\n');
-      if (!respostasTexto) respostasTexto = 'Nenhuma resposta enviada no chat.';
-
-      const canalLogsRecrutamento = guild ? guild.channels.cache.get(ID_CANAL_LOGS_RECRUTAMENTO) : null;
-
-      if (canalLogsRecrutamento) {
-        const embedRecrutamento = new EmbedBuilder()
-          .setTitle('📥 **NOVA CANDIDATURA - EDITAL DA TURQUIA**')
-          .setColor('#e74c3c')
-          .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-          .addFields(
-            { name: '👤 Candidato', value: `${user} (\`${user.id}\`)`, inline: false },
-            { name: '📝 Respostas Coletadas', value: respostasTexto.length > 1024 ? respostasTexto.substring(0, 1021) + '...' : respostasTexto, inline: false }
-          )
-          .setFooter({ text: 'Sistema de Recrutamento - Turquia', iconURL: guild ? guild.iconURL() : null })
-          .setTimestamp();
-
-        await canalLogsRecrutamento.send({
-          content: `🔔 **Nova candidatura concluída por ${user}!**`,
-          embeds: [embedRecrutamento]
-        });
-      }
-
-      await channel.send('✅ **Edital enviado com sucesso para a liderança!** Este canal será encerrado em 5 segundos.');
-      
-      setTimeout(async () => {
-        try {
-          await channel.delete();
-        } catch (e) {
-          console.error('Erro ao apagar thread:', e);
-        }
-      }, 5000);
-
-    } catch (error) {
-      console.error('❌ Erro ao finalizar recrutamento:', error);
+      await canalLogs.send({
+        content: `🔔 **Nova candidatura concluída por ${message.author}!**`,
+        embeds: [embed]
+      });
     }
+
+    // Limpa a sessão da memória e encerra a thread
+    recrutamentosAtivos.delete(message.channel.id);
+
+    await message.channel.send('🔒 **Este canal será encerrado em 5 segundos.** Obrigado por fazer o recrutamento!');
+
+    setTimeout(async () => {
+      try {
+        await message.channel.delete();
+      } catch (e) {
+        console.error('Erro ao apagar thread:', e);
+      }
+    }, 5000);
   }
 });
