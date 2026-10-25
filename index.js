@@ -378,7 +378,7 @@ client.once('ready', async () => {
       );
 
       await canalRecrutamento.send({
-        content: '⚔️ **RECRUTAMENTO DA FACÇÃO**\n\nClica no botão abaixo para abrir o teu canal de recrutamento privado e responder às perguntas com calma!',
+        content: '🇹🇷 **Edital da Turquia**\n\n🔥 Clique no botão abaixo para iniciar o seu recrutamento e fazer parte da nossa família!',
         components: [rowRecrutamento]
       });
     } catch (error) {
@@ -408,7 +408,7 @@ client.on('interactionCreate', async (interaction) => {
 
       // Envia as instruções e as 15 perguntas lá dentro
       await thread.send({
-        content: `👋 Olá ${user}! Bem-vindo ao teu canal de recrutamento privado.\n\nPor favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui em baixo (podes responder todas numa única mensagem bem estruturada ou enviar em várias mensagens):\n\n` +
+        content: `👋 Olá ${user}! Bem-vindo ao teu canal de recrutamento privado.\n\nPor favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui em baixo (podes responder todas numa única mensagem bem estruturada ou em várias mensagens):\n\n` +
           `1️⃣ O que é Roleplay?\n` +
           `2️⃣ O que é Anti-Roleplay? Explique.\n` +
           `3️⃣ O que é RDM?\n` +
@@ -462,14 +462,14 @@ client.on('interactionCreate', async (interaction) => {
 
       if (canalLogsRecrutamento) {
         const embedRecrutamento = new EmbedBuilder()
-          .setTitle('📥 **NOVA CANDIDATURA DE RECRUTAMENTO (15 PERGUNTAS)**')
-          .setColor('#2ecc71')
+          .setTitle('📥 **NOVA CANDIDATURA - EDITAL DA TURQUIA**')
+          .setColor('#e74c3c')
           .setThumbnail(user.displayAvatarURL({ dynamic: true }))
           .addFields(
             { name: '👤 Candidato', value: `${user} (\`${user.id}\`)`, inline: false },
             { name: '📝 Respostas Coletadas', value: respostasTexto.length > 1024 ? respostasTexto.substring(0, 1021) + '...' : respostasTexto, inline: false }
           )
-          .setFooter({ text: 'Sistema de Recrutamento por Thread Privada', iconURL: guild ? guild.iconURL() : null })
+          .setFooter({ text: 'Sistema de Recrutamento - Turquia', iconURL: guild ? guild.iconURL() : null })
           .setTimestamp();
 
         await canalLogsRecrutamento.send({
