@@ -362,11 +362,12 @@ client.once('ready', async () => {
   const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
   if (canalRecrutamento) {
     try {
-      const mensagens = await canalRecrutamento.messages.fetch({ limit: 10 });
-      const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
-      
-      if (mensagensDoBot.size > 0) {
-        await canalRecrutamento.bulkDelete(mensagensDoBot);
+      const mensagens = await canalRecrutamento.messages.fetch({ limit: 10 }).catch(() => null);
+      if (mensagens) {
+        const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
+        if (mensagensDoBot.size > 0) {
+          await canalRecrutamento.bulkDelete(mensagensDoBot).catch(() => null);
+        }
       }
 
       const rowRecrutamento = new ActionRowBuilder().addComponents(
@@ -388,36 +389,33 @@ client.once('ready', async () => {
   }
 });
 
-// 2. Manipulador de Interações (Botões e Fluxo de Recrutamento)
+// 2. Manipulador de Interações
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
   const { customId, user, guild, channel } = interaction;
 
-  try {
-    // CLIQUE NO BOTÃO "FAZER RECRUTAMENTO"
-    if (customId === 'btn_abrir_recrutamento_thread') {
+  // CLIQUE NO BOTÃO "FAZER RECRUTAMENTO"
+  if (customId === 'btn_abrir_recrutamento_thread') {
+    try {
+      // Responde imediatamente ao Discord (ephemeral = só o player vê)
       await interaction.deferReply({ ephemeral: true });
 
-      const threadExistente = channel.threads.cache.find(t => t.name === `recrutamento-${user.username.toLowerCase()}`);
-      if (threadExistente) {
-        return await interaction.editReply({
-          content: `⚠️ Já tens um recrutamento em andamento aqui: ${threadExistente}`
-        });
-      }
-
+      // Tenta criar a thread privada
       const thread = await channel.threads.create({
-        name: `recrutamento-${user.username}`,
+        name: `recrutamento-${user.username.replace(/[^a-zA-Z0-9]/g, '')}`,
         autoArchiveDuration: 60,
         type: ChannelType.GuildPrivateThread,
         reason: `Edital de Recrutamento da Turquia - ${user.tag}`
       });
 
+      // Adiciona o jogador à thread
       await thread.members.add(user.id);
 
+      // Envia as perguntas na thread privada
       await thread.send({
         content: `👋 Olá ${user}! Bem-vindo ao teu canal de recrutamento privado da **Turquia**.\n\n` +
-          `Por favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui no chat (podes responder tudo numa única mensagem ou em várias mensagens organizadas):\n\n` +
+          `Por favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui no chat:\n\n` +
           `1️⃣ O que é Roleplay?\n` +
           `2️⃣ O que é Anti-Roleplay? Explique.\n` +
           `3️⃣ O que é RDM?\n` +
@@ -445,13 +443,26 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
+      // Confirma ao jogador
       return await interaction.editReply({
         content: `✅ O teu canal privado de recrutamento foi aberto com sucesso! Clica aqui para aceder: ${thread}`
       });
-    }
 
-    // CLIQUE NO BOTÃO "ENVIAR RESPOSTAS" DENTRO DA THREAD
-    if (customId.startsWith('concluir_rec_')) {
+    } catch (error) {
+      console.error('❌ Erro ao criar recrutamento:', error);
+      
+      // Avisa o jogador do erro no Discord em vez de ficar "a pensar"
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({
+          content: `❌ Ocorreu um erro ao abrir a tua sala de recrutamento. Garante que o bot tem permissão de **Criar Threads Privadas** neste canal! Error: \`${error.message}\``
+        });
+      }
+    }
+  }
+
+  // CLIQUE NO BOTÃO "ENVIAR RESPOSTAS" DENTRO DA THREAD
+  if (customId.startsWith('concluir_rec_')) {
+    try {
       const userId = customId.split('_')[2];
       
       if (user.id !== userId) {
@@ -498,9 +509,9 @@ client.on('interactionCreate', async (interaction) => {
           console.error('Erro ao apagar thread:', e);
         }
       }, 5000);
-    }
 
-  } catch (error) {
-    console.error('❌ Erro no processamento da interação:', error);
+    } catch (error) {
+      console.error('❌ Erro ao finalizar recrutamento:', error);
+    }
   }
 });
