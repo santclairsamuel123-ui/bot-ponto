@@ -350,3 +350,146 @@ client.on('guildMemberRemove', (member) => {
 });
 
 
+
+// ===================================================
+// SISTEMA DE RECRUTAMENTO DA FACÇÃO
+// ===================================================
+const ID_CANAL_PAINEL_RECRUTAMENTO = '1562603191625977900';
+const ID_CANAL_LOGS_RECRUTAMENTO = '1563928804290986165';
+
+// 1. Enviar o painel de recrutamento automaticamente ao ligar (sem flood)
+client.once('ready', async () => {
+  const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
+  if (canalRecrutamento) {
+    try {
+      const mensagens = await canalRecrutamento.messages.fetch({ limit: 10 });
+      const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
+      
+      if (mensagensDoBot.size > 0) {
+        await canalRecrutamento.bulkDelete(mensagensDoBot);
+      }
+
+      const rowRecrutamento = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('btn_abrir_recrutamento')
+          .setLabel('Fazer Recrutamento')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📝')
+      );
+
+      await canalRecrutamento.send({
+        content: '⚔️ **RECRUTAMENTO DA FACÇÃO**\n\nClica no botão abaixo para preencher o formulário de recrutamento. As tuas respostas serão enviadas diretamente para a nossa liderança!',
+        components: [rowRecrutamento]
+      });
+    } catch (error) {
+      console.error('Erro ao limpar/enviar painel de recrutamento:', error);
+    }
+  }
+});
+
+// 2. Manipulador das interações (Botão e Envio do Modal)
+client.on('interactionCreate', async (interaction) => {
+  try {
+    const { customId, user, guild } = interaction;
+
+    // Quando clica no botão "Fazer Recrutamento"
+    if (interaction.isButton() && customId === 'btn_abrir_recrutamento') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_recrutamento')
+        .setTitle('Formulário de Recrutamento');
+
+      // Campo 1 (Perguntas 1 e 2)
+      const q1 = new TextInputBuilder()
+        .setCustomId('rec_p1')
+        .setLabel('1. O que é Roleplay e Anti-Roleplay?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Explique com as suas palavras...')
+        .setRequired(true);
+
+      // Campo 2 (Perguntas 3 e 4)
+      const q2 = new TextInputBuilder()
+        .setCustomId('rec_p2')
+        .setLabel('2. O que são RDM e VDM?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Explique os dois conceitos...')
+        .setRequired(true);
+
+      // Campo 3 (Perguntas 5 e 6)
+      const q3 = new TextInputBuilder()
+        .setCustomId('rec_p3')
+        .setLabel('3. O que são Ghost-Gaming e Meta-Gaming?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Explique os dois conceitos...')
+        .setRequired(true);
+
+      // Campo 4 (Pergunta 7)
+      const q4 = new TextInputBuilder()
+        .setCustomId('rec_p4')
+        .setLabel('4. O que é PowerGaming? Explique.')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Explique detalhadamente...')
+        .setRequired(true);
+
+      // Campo 5 (Perguntas 8 e 9)
+      const q5 = new TextInputBuilder()
+        .setCustomId('rec_p5')
+        .setLabel('5. O que significam ICC e OOC?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Explique as duas siglas...')
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(q1),
+        new ActionRowBuilder().addComponents(q2),
+        new ActionRowBuilder().addComponents(q3),
+        new ActionRowBuilder().addComponents(q4),
+        new ActionRowBuilder().addComponents(q5)
+      );
+
+      return await interaction.showModal(modal);
+    }
+
+    // Quando envia o formulário preenchido
+    if (interaction.isModalSubmit() && customId === 'modal_recrutamento') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const resp1 = interaction.fields.getTextInputValue('rec_p1');
+      const resp2 = interaction.fields.getTextInputValue('rec_p2');
+      const resp3 = interaction.fields.getTextInputValue('rec_p3');
+      const resp4 = interaction.fields.getTextInputValue('rec_p4');
+      const resp5 = interaction.fields.getTextInputValue('rec_p5');
+
+      const canalLogsRecrutamento = guild ? guild.channels.cache.get(ID_CANAL_LOGS_RECRUTAMENTO) : null;
+
+      if (canalLogsRecrutamento) {
+        const embedRecrutamento = new EmbedBuilder()
+          .setTitle('📥 **NOVA CANDIDATURA DE RECRUTAMENTO**')
+          .setColor('#9b59b6')
+          .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+          .addFields(
+            { name: '👤 Candidato', value: `${user} (\`${user.id}\`)`, inline: false },
+            { name: '1️⃣ O que é Roleplay e Anti-Roleplay?', value: resp1, inline: false },
+            { name: '2️⃣ O que são RDM e VDM?', value: resp2, inline: false },
+            { name: '3️⃣ O que são Ghost-Gaming e Meta-Gaming?', value: resp3, inline: false },
+            { name: '4️⃣ O que é PowerGaming?', value: resp4, inline: false },
+            { name: '5️⃣ O que significam ICC e OOC?', value: resp5, inline: false }
+          )
+          .setFooter({ text: 'Sistema de Recrutamento', iconURL: guild ? guild.iconURL() : null })
+          .setTimestamp();
+
+        // Envia a log no canal privado marcando o player
+        await canalLogsRecrutamento.send({
+          content: `🔔 **Nova submissão recebida de ${user}!**`,
+          embeds: [embedRecrutamento]
+        });
+      }
+
+      await interaction.editReply({
+        content: '✅ **Formulário enviado com sucesso!** As tuas respostas foram encaminhadas para a liderança.'
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Erro no sistema de recrutamento:', error);
+  }
+});
