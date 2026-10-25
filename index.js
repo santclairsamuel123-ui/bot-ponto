@@ -357,7 +357,7 @@ client.on('guildMemberRemove', (member) => {
 const ID_CANAL_PAINEL_RECRUTAMENTO = '1562603191625977900';
 const ID_CANAL_LOGS_RECRUTAMENTO = '1563928804290986165';
 
-// 1. Enviar o painel de recrutamento automaticamente ao ligar
+// 1. Enviar e atualizar o painel de recrutamento ao ligar o bot
 client.once('ready', async () => {
   const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
   if (canalRecrutamento) {
@@ -381,34 +381,43 @@ client.once('ready', async () => {
         content: '🇹🇷 **Edital da Turquia**\n\n🔥 Clique no botão abaixo para iniciar o seu recrutamento e fazer parte da nossa família!',
         components: [rowRecrutamento]
       });
+      console.log('✅ Painel "Edital da Turquia" enviado com sucesso!');
     } catch (error) {
-      console.error('Erro ao enviar painel de recrutamento:', error);
+      console.error('❌ Erro ao enviar painel de recrutamento:', error);
     }
   }
 });
 
-// 2. Manipulador do Botão para criar a Thread Privada
+// 2. Manipulador de Interações (Botões e Fluxo de Recrutamento)
 client.on('interactionCreate', async (interaction) => {
-  try {
-    const { customId, user, guild, channel } = interaction;
+  if (!interaction.isButton()) return;
 
-    if (interaction.isButton() && customId === 'btn_abrir_recrutamento_thread') {
+  const { customId, user, guild, channel } = interaction;
+
+  try {
+    // CLIQUE NO BOTÃO "FAZER RECRUTAMENTO"
+    if (customId === 'btn_abrir_recrutamento_thread') {
       await interaction.deferReply({ ephemeral: true });
 
-      // Cria uma thread privada no canal do painel
+      const threadExistente = channel.threads.cache.find(t => t.name === `recrutamento-${user.username.toLowerCase()}`);
+      if (threadExistente) {
+        return await interaction.editReply({
+          content: `⚠️ Já tens um recrutamento em andamento aqui: ${threadExistente}`
+        });
+      }
+
       const thread = await channel.threads.create({
         name: `recrutamento-${user.username}`,
         autoArchiveDuration: 60,
         type: ChannelType.GuildPrivateThread,
-        reason: `Formulário de recrutamento de ${user.tag}`
+        reason: `Edital de Recrutamento da Turquia - ${user.tag}`
       });
 
-      // Adiciona o utilizador à thread privada
       await thread.members.add(user.id);
 
-      // Envia as instruções e as 15 perguntas lá dentro
       await thread.send({
-        content: `👋 Olá ${user}! Bem-vindo ao teu canal de recrutamento privado.\n\nPor favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui em baixo (podes responder todas numa única mensagem bem estruturada ou em várias mensagens):\n\n` +
+        content: `👋 Olá ${user}! Bem-vindo ao teu canal de recrutamento privado da **Turquia**.\n\n` +
+          `Por favor, responde às seguintes **15 perguntas** enviando as tuas respostas aqui no chat (podes responder tudo numa única mensagem ou em várias mensagens organizadas):\n\n` +
           `1️⃣ O que é Roleplay?\n` +
           `2️⃣ O que é Anti-Roleplay? Explique.\n` +
           `3️⃣ O que é RDM?\n` +
@@ -441,22 +450,24 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
-    // 3. Quando o candidato clica em "Enviar Respostas" na Thread
-    if (interaction.isButton() && customId.startsWith('concluir_rec_')) {
+    // CLIQUE NO BOTÃO "ENVIAR RESPOSTAS" DENTRO DA THREAD
+    if (customId.startsWith('concluir_rec_')) {
       const userId = customId.split('_')[2];
       
       if (user.id !== userId) {
-        return await interaction.reply({ content: '❌ Apenas o candidato pode finalizar este recrutamento.', ephemeral: true });
+        return await interaction.reply({ 
+          content: '❌ Apenas o candidato pode finalizar este recrutamento.', 
+          ephemeral: true 
+        });
       }
 
       await interaction.deferUpdate();
 
-      // Busca as mensagens enviadas pelo candidato na thread
-      const mensagensThread = await interaction.channel.messages.fetch({ limit: 100 });
+      const mensagensThread = await channel.messages.fetch({ limit: 100 });
       const mensagensUsuario = mensagensThread.filter(m => m.author.id === userId && !m.author.bot);
 
       let respostasTexto = mensagensUsuario.map(m => m.content).reverse().join('\n\n--- Resposta Seguinte ---\n\n');
-      if (!respostasTexto) respostasTexto = 'Nenhuma resposta detalhada enviada.';
+      if (!respostasTexto) respostasTexto = 'Nenhuma resposta enviada no chat.';
 
       const canalLogsRecrutamento = guild ? guild.channels.cache.get(ID_CANAL_LOGS_RECRUTAMENTO) : null;
 
@@ -478,12 +489,11 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      await interaction.channel.send('✅ **Formulário enviado com sucesso para a liderança!** Este canal privado será encerrado em breve.');
+      await channel.send('✅ **Edital enviado com sucesso para a liderança!** Este canal será encerrado em 5 segundos.');
       
-      // Apaga a thread após 5 segundos
       setTimeout(async () => {
         try {
-          await interaction.channel.delete();
+          await channel.delete();
         } catch (e) {
           console.error('Erro ao apagar thread:', e);
         }
@@ -491,6 +501,6 @@ client.on('interactionCreate', async (interaction) => {
     }
 
   } catch (error) {
-    console.error('❌ Erro no sistema de recrutamento por thread:', error);
+    console.error('❌ Erro no processamento da interação:', error);
   }
 });
