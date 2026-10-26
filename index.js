@@ -25,7 +25,7 @@ app.listen(PORT, () => {
 });
 
 // ===================================================
-// CONFIGURAÇÕES DO BOT
+// CONFIGURAÇÕES DO BOT E IDs
 // ===================================================
 const CONFIG = {
   ID_CANAL_LOGS_PONTO: '1563319588614045776',
@@ -35,10 +35,17 @@ const CONFIG = {
 
 const CARGO_CIDADAO_ID = '1562603190653026352'; 
 const ID_CANAL_LOGS_REGISTRO = '1562603191324115092'; 
-const ID_CANAL_PAINEL_REGISTRO = '1562603191324115091';
+const ID_CANAL_PAINEL_REGISTO = '1562603191324115091';
 
-// Objeto para armazenar as sessões de bate-ponto ativas em memória
+const ID_CANAL_BEM_VINDO = '1562603191324115087';
+const ID_CANAL_SAIDA = '1562603191324115088';
+
+const ID_CANAL_PAINEL_RECRUTAMENTO = '1562603191625977900';
+const ID_CANAL_LOGS_RECRUTAMENTO = '1563928804290986165';
+
+// Memórias temporárias
 const sessoesPonto = new Map();
+const recrutamentosAtivos = new Map();
 
 const client = new Client({
   intents: [
@@ -50,38 +57,100 @@ const client = new Client({
 });
 
 // ===================================================
-// EVENTO READY (LIGAR E ENVIAR PAINEL DE REGISTRO)
+// EVENTO READY (UNIFICADO - ENVIA TODOS OS PAINÉIS)
 // ===================================================
 client.once('ready', async () => {
   console.log(`✅ Bot online como ${client.user.tag}!`);
 
-  // Limpa e envia o painel de registro automaticamente no canal configurado
-  const canalRegistro = client.channels.cache.get(ID_CANAL_PAINEL_REGISTRO);
-  if (canalRegistro) {
+  // 1. Enviar Painel de Registo
+  const canalRegisto = client.channels.cache.get(ID_CANAL_PAINEL_REGISTO);
+  if (canalRegisto) {
     try {
-      const mensagens = await canalRegistro.messages.fetch({ limit: 10 });
-      const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
-      
-      if (mensagensDoBot.size > 0) {
-        await canalRegistro.bulkDelete(mensagensDoBot);
+      const mensagens = await canalRegisto.messages.fetch({ limit: 10 }).catch(() => null);
+      if (mensagens) {
+        const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
+        if (mensagensDoBot.size > 0) {
+          await canalRegisto.bulkDelete(mensagensDoBot).catch(() => null);
+        }
       }
 
-      const row = new ActionRowBuilder().addComponents(
+      const rowRegisto = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId('btn_abrir_registro')
-          .setLabel('Registrar-se')
+          .setCustomId('btn_liberar_acesso')
+          .setLabel('Liberar meu acesso')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('📋')
+          .setEmoji('🟢')
       );
 
-      await canalRegistro.send({
-        content: '📋 **REGISTRO DE CIDADÃO**\n\nClica no botão abaixo para preencher o teu Nome e ID e liberar o teu acesso ao servidor!',
-        components: [row]
+      const embedRegisto = new EmbedBuilder()
+        .setColor('#e74c3c')
+        .setDescription(
+          `👋 **· Boas-vindas à Turquia**\n` +
+          `Para obter acesso completo ao nosso servidor do Discord, realize a sua verificação.\n\n` +
+          `✅ **· Como verificar a sua conta?**\n` +
+          `Clique no botão abaixo, informe o **Nome / Vulgo** que irá utilizar na facção e o seu **Passaporte (ID)** no jogo para prosseguir com o seu registo.\n\n` +
+          `ℹ️ **· Por que realizar a verificação?**\n` +
+          `O sistema de verificação é essencial para manter a organização, o controlo de membros e garantir um ambiente limpo e seguro para a nossa comunidade.`
+        )
+        .setImage('https://i.imgur.com/8Q6Vp2D.png');
+
+      await canalRegisto.send({
+        embeds: [embedRegisto],
+        components: [rowRegisto]
       });
+      
+      console.log('✅ Painel de Registo enviado com sucesso!');
     } catch (error) {
-      console.error('Erro ao limpar/enviar painel de registro:', error);
+      console.error('❌ Erro ao enviar painel de registo:', error);
     }
   }
+
+  // 2. Enviar Painel de Recrutamento
+  const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
+  if (canalRecrutamento) {
+    try {
+      const mensagens = await canalRecrutamento.messages.fetch({ limit: 10 }).catch(() => null);
+      if (mensagens) {
+        const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
+        if (mensagensDoBot.size > 0) {
+          await canalRecrutamento.bulkDelete(mensagensDoBot).catch(() => null);
+        }
+      }
+
+      const rowRecrutamento = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('btn_abrir_recrutamento_thread')
+          .setLabel('Fazer Recrutamento')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('📝')
+      );
+
+      await canalRecrutamento.send({
+        content: '🇹🇷 **Edital da Turquia**\n\n🔥 Clique no botão abaixo para iniciar o seu recrutamento e fazer parte da nossa família!',
+        components: [rowRecrutamento]
+      });
+      console.log('✅ Painel "Edital da Turquia" enviado com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao enviar painel de recrutamento:', error);
+    }
+  }
+});
+
+// ===================================================
+// EVENTOS DE ENTRADA E SAÍDA DE MEMBROS
+// ===================================================
+client.on('guildMemberAdd', (member) => {
+  const canal = member.guild.channels.cache.get(ID_CANAL_BEM_VINDO);
+  if (!canal) return;
+
+  canal.send(`👋 Olá ${member}, sê muito bem-vindo(a) ao **${member.guild.name}**! Não te esqueças de ir ao canal de registro para liberar o teu acesso.`);
+});
+
+client.on('guildMemberRemove', (member) => {
+  const canal = member.guild.channels.cache.get(ID_CANAL_SAIDA);
+  if (!canal) return;
+
+  canal.send(`📤 **${member.user.tag}** saiu do servidor.`);
 });
 
 // ===================================================
@@ -138,7 +207,7 @@ client.on('messageCreate', async (message) => {
 });
 
 // ===================================================
-// GERENCIADOR DE INTERAÇÕES (BOTÕES E MODAIS)
+// GERENCIADOR DE INTERAÇÕES (REGISTO, PONTO E RECRUTAMENTO)
 // ===================================================
 client.on('interactionCreate', async (interaction) => {
   try {
@@ -149,28 +218,28 @@ client.on('interactionCreate', async (interaction) => {
     // -----------------------------------------------
     // 1. SISTEMA DE REGISTRO (BOTÃO E MODAL)
     // -----------------------------------------------
-    if (interaction.isButton() && customId === 'btn_abrir_registro') {
+    if (interaction.isButton() && customId === 'btn_liberar_acesso') {
       const modal = new ModalBuilder()
         .setCustomId('modal_registro')
-        .setTitle('Registro de Cidadão');
+        .setTitle('Registo — Turquia');
 
       const inputNome = new TextInputBuilder()
-        .setCustomId('input_nome')
-        .setLabel('Seu Nome no Jogo')
+        .setCustomId('reg_nome')
+        .setLabel('Nome / Vulgo no jogo')
+        .setPlaceholder('Ex: Pedrinho / BK')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: Arthur Morgan')
         .setRequired(true);
 
-      const inputID = new TextInputBuilder()
-        .setCustomId('input_id')
-        .setLabel('Seu ID no Jogo')
-        .setStyle(TextInputStyle.Short)
+      const inputPassaporte = new TextInputBuilder()
+        .setCustomId('reg_passaporte')
+        .setLabel('Passaporte (ID)')
         .setPlaceholder('Ex: 1234')
+        .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(inputNome),
-        new ActionRowBuilder().addComponents(inputID)
+        new ActionRowBuilder().addComponents(inputPassaporte)
       );
 
       return await interaction.showModal(modal);
@@ -179,9 +248,9 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isModalSubmit() && customId === 'modal_registro') {
       await interaction.deferReply({ ephemeral: true });
 
-      const nome = interaction.fields.getTextInputValue('input_nome');
-      const id = interaction.fields.getTextInputValue('input_id');
-      const novoApelido = `${nome} | ${id}`;
+      const nome = interaction.fields.getTextInputValue('reg_nome');
+      const passaporte = interaction.fields.getTextInputValue('reg_passaporte');
+      const novoApelido = `[${passaporte}] ${nome}`;
 
       try {
         if (interaction.member.manageable) {
@@ -193,24 +262,56 @@ client.on('interactionCreate', async (interaction) => {
 
       const cargo = interaction.guild.roles.cache.get(CARGO_CIDADAO_ID);
       if (cargo) {
-        await interaction.member.roles.add(cargo);
+        await interaction.member.roles.add(cargo).catch(() => null);
       }
 
       await interaction.editReply({
-        content: `✅ Registro concluído com sucesso! Bem-vindo(a), **${novoApelido}**.`
+        content: `✅ **Registo efetuado com sucesso!** Bem-vindo(a) à Turquia, **${novoApelido}**.`
       });
 
       await enviarLogRegistro(
         interaction.guild,
-        '📋 Novo Registro Realizado',
-        `**Membro:** ${interaction.user} (${interaction.user.tag})\n**Nome no Jogo:** ${nome}\n**ID:** ${id}\n**Novo Apelido:** \`${novoApelido}\``,
-        0x0099FF
+        '✅ Novo Membro Registado — Turquia',
+        `**Membro:** ${interaction.user} (\`${interaction.user.tag}\`)\n**Nome / Vulgo:** \`${nome}\`\n**Passaporte (ID):** \`${passaporte}\`\n**Novo Apelido:** \`${novoApelido}\``,
+        0x2ecc71
       );
       return;
     }
 
     // -----------------------------------------------
-    // 2. SISTEMA DE BATE-PONTO (BOTÕES)
+    // 2. SISTEMA DE RECRUTAMENTO (ABRIR THREAD)
+    // -----------------------------------------------
+    if (interaction.isButton() && customId === 'btn_abrir_recrutamento_thread') {
+      await interaction.deferReply({ ephemeral: true });
+
+      const thread = await interaction.channel.threads.create({
+        name: `recrutamento-${user.username.replace(/[^a-zA-Z0-9]/g, '')}`,
+        autoArchiveDuration: 60,
+        type: ChannelType.GuildPrivateThread,
+        reason: `Edital de Recrutamento da Turquia - ${user.tag}`
+      });
+
+      await thread.members.add(user.id);
+
+      recrutamentosAtivos.set(thread.id, {
+        userId: user.id,
+        perguntaAtual: 0,
+        respostas: []
+      });
+
+      await thread.send(
+        `👋 Olá ${user}! Bem-vindo ao teu edital privado da **Turquia**.\n\n` +
+        `Vou enviar **uma pergunta de cada vez**. Responde no chat para avançar!\n\n` +
+        `📌 **Pergunta 1/15:**\n${PERGUNTAS_RECRUTAMENTO[0]}`
+      );
+
+      return await interaction.editReply({
+        content: `✅ O teu canal privado de recrutamento foi aberto com sucesso! Clica aqui para aceder: ${thread}`
+      });
+    }
+
+    // -----------------------------------------------
+    // 3. SISTEMA DE BATE-PONTO (BOTÕES)
     // -----------------------------------------------
     if (interaction.isButton()) {
       const canalLogsPonto = guild ? guild.channels.cache.get(CONFIG.ID_CANAL_LOGS_PONTO) : null;
@@ -299,6 +400,91 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ===================================================
+// FLUXO DE RECRUTAMENTO PASSO A PASSO (15 PERGUNTAS)
+// ===================================================
+const PERGUNTAS_RECRUTAMENTO = [
+  '1️⃣ O que é Roleplay?',
+  '2️⃣ O que é Anti-Roleplay? Explique.',
+  '3️⃣ O que é RDM?',
+  '4️⃣ O que é VDM?',
+  '5️⃣ O que é ghost-gaming?',
+  '6️⃣ O que é meta-gaming? Explique.',
+  '7️⃣ O que é PowerGaming? Explique.',
+  '8️⃣ O que é ICC?',
+  '9️⃣ O que é OOC?',
+  '🔟 O que é Combat-Logging?',
+  '1️⃣1️⃣ O que é DVR?',
+  '1️⃣2️⃣ O que é Dark-RP?',
+  '1️⃣3️⃣ Se um player cometer um Anti-RP contigo, o que deverias fazer?',
+  '1️⃣4️⃣ Estás disposto a seguir as regras da nossa facção e do servidor? Aceitarias levar punições ou advertências quando fizeres algo errado na facção?',
+  '1️⃣5️⃣ O seu edital foi realizado com sucesso! Responda apenas "TDT", envie e aguarde o resultado.'
+];
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot || !message.channel.isThread()) return;
+
+  const sessao = recrutamentosAtivos.get(message.channel.id);
+  if (!sessao) return;
+
+  if (message.author.id !== sessao.userId) return;
+
+  sessao.respostas.push({
+    pergunta: PERGUNTAS_RECRUTAMENTO[sessao.perguntaAtual],
+    resposta: message.content
+  });
+
+  sessao.perguntaAtual++;
+
+  if (sessao.perguntaAtual < PERGUNTAS_RECRUTAMENTO.length) {
+    await message.channel.send(
+      `📌 **Pergunta ${sessao.perguntaAtual + 1}/15:**\n${PERGUNTAS_RECRUTAMENTO[sessao.perguntaAtual]}`
+    );
+  } else {
+    await message.channel.send('✅ **Edital concluído com sucesso!** A compilar e enviar a tua ficha para a liderança...');
+
+    const guild = message.guild;
+    const canalLogs = guild ? guild.channels.cache.get(ID_CANAL_LOGS_RECRUTAMENTO) : null;
+
+    if (canalLogs) {
+      const embed = new EmbedBuilder()
+        .setTitle('📥 **NOVA CANDIDATURA - EDITAL DA TURQUIA**')
+        .setColor('#e74c3c')
+        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: '👤 Candidato', value: `${message.author} (\`${message.author.id}\`)`, inline: false }
+        )
+        .setFooter({ text: 'Sistema de Recrutamento Passo a Passo - Turquia', iconURL: guild ? guild.iconURL() : null })
+        .setTimestamp();
+
+      sessao.respostas.forEach((item) => {
+        embed.addFields({
+          name: `${item.pergunta}`,
+          value: item.resposta.length > 1024 ? item.resposta.substring(0, 1021) + '...' : item.resposta,
+          inline: false
+        });
+      });
+
+      await canalLogs.send({
+        content: `🔔 **Nova candidatura concluída por ${message.author}!**`,
+        embeds: [embed]
+      });
+    }
+
+    recrutamentosAtivos.delete(message.channel.id);
+
+    await message.channel.send('🔒 **Este canal será encerrado em 5 segundos.** Obrigado por fazer o recrutamento!');
+
+    setTimeout(async () => {
+      try {
+        await message.channel.delete();
+      } catch (e) {
+        console.error('Erro ao apagar thread:', e);
+      }
+    }, 5000);
+  }
+});
+
+// ===================================================
 // FUNÇÃO AUXILIAR DE LOGS DO REGISTRO
 // ===================================================
 async function enviarLogRegistro(guild, titulo, descricao, cor = 0x00FF00) {
@@ -323,288 +509,3 @@ async function enviarLogRegistro(guild, titulo, descricao, cor = 0x00FF00) {
 
 // Login do Bot
 client.login(process.env.DISCORD_TOKEN);
-
-
-// ==========================================
-// BOAS-VINDAS AUTOMÁTICAS
-// ==========================================
-const ID_CANAL_BEM_VINDO = '1562603191324115087';
-
-client.on('guildMemberAdd', (member) => {
-  const canal = member.guild.channels.cache.get(ID_CANAL_BEM_VINDO);
-  if (!canal) return;
-
-  canal.send(`👋 Olá ${member}, sê muito bem-vindo(a) ao **${member.guild.name}**! Não te esqueças de ir ao canal de registro para liberar o teu acesso.`);
-});
-
-
-// ==========================================
-// AVISO DE SAÍDA DE MEMBROS
-// ==========================================
-const ID_CANAL_SAIDA = '1562603191324115088'; // Substitui pelo ID do canal onde quieres que o aviso apareça
-
-client.on('guildMemberRemove', (member) => {
-  const canal = member.guild.channels.cache.get(ID_CANAL_SAIDA);
-  if (!canal) return;
-
-  canal.send(`📤 **${member.user.tag}** saiu do servidor.`);
-});
-
-
-
-// ===================================================
-// SISTEMA DE RECRUTAMENTO PASSO A PASSO (15 PERGUNTAS)
-// ===================================================
-const ID_CANAL_PAINEL_RECRUTAMENTO = '1562603191625977900';
-const ID_CANAL_LOGS_RECRUTAMENTO = '1563928804290986165';
-
-// Lista com as 15 Perguntas
-const PERGUNTAS_RECRUTAMENTO = [
-  '1️⃣ O que é Roleplay?',
-  '2️⃣ O que é Anti-Roleplay? Explique.',
-  '3️⃣ O que é RDM?',
-  '4️⃣ O que é VDM?',
-  '5️⃣ O que é ghost-gaming?',
-  '6️⃣ O que é meta-gaming? Explique.',
-  '7️⃣ O que é PowerGaming? Explique.',
-  '8️⃣ O que é ICC?',
-  '9️⃣ O que é OOC?',
-  '🔟 O que é Combat-Logging?',
-  '1️⃣1️⃣ O que é DVR?',
-  '1️⃣2️⃣ O que é Dark-RP?',
-  '1️⃣3️⃣ Se um player cometer um Anti-RP contigo, o que deverias fazer?',
-  '1️⃣4️⃣ Estás disposto a seguir as regras da nossa facção e do servidor? Aceitarias levar punições ou advertências quando fizeres algo errado na facção?',
-  '1️⃣5️⃣ O seu edital foi realizado com sucesso! Responda apenas "TDT", envie e aguarde o resultado.'
-];
-
-// Guardar o progresso dos recrutamentos em memória
-const recrutamentosAtivos = new Map();
-
-// 1. Painel Inicial
-client.once('ready', async () => {
-  const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
-  if (canalRecrutamento) {
-    try {
-      const mensagens = await canalRecrutamento.messages.fetch({ limit: 10 }).catch(() => null);
-      if (mensagens) {
-        const mensagensDoBot = mensagens.filter(msg => msg.author.id === client.user.id);
-        if (mensagensDoBot.size > 0) {
-          await canalRecrutamento.bulkDelete(mensagensDoBot).catch(() => null);
-        }
-      }
-
-      const rowRecrutamento = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('btn_abrir_recrutamento_thread')
-          .setLabel('Fazer Recrutamento')
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji('📝')
-      );
-
-      await canalRecrutamento.send({
-        content: '🇹🇷 **Edital da Turquia**\n\n🔥 Clique no botão abaixo para iniciar o seu recrutamento e fazer parte da nossa família!',
-        components: [rowRecrutamento]
-      });
-      console.log('✅ Painel "Edital da Turquia" enviado com sucesso!');
-    } catch (error) {
-      console.error('❌ Erro ao enviar painel de recrutamento:', error);
-    }
-  }
-});
-
-// 2. Criar a Thread Privada e Iniciar Pergunta 1
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isButton()) return;
-
-  const { customId, user, channel } = interaction;
-
-  if (customId === 'btn_abrir_recrutamento_thread') {
-    try {
-      await interaction.deferReply({ ephemeral: true });
-
-      const thread = await channel.threads.create({
-        name: `recrutamento-${user.username.replace(/[^a-zA-Z0-9]/g, '')}`,
-        autoArchiveDuration: 60,
-        type: ChannelType.GuildPrivateThread,
-        reason: `Edital de Recrutamento da Turquia - ${user.tag}`
-      });
-
-      await thread.members.add(user.id);
-
-      // Regista a sessão de recrutamento do candidato
-      recrutamentosAtivos.set(thread.id, {
-        userId: user.id,
-        perguntaAtual: 0,
-        respostas: []
-      });
-
-      await thread.send(
-        `👋 Olá ${user}! Bem-vindo ao teu edital privado da **Turquia**.\n\n` +
-        `Vou enviar **uma pergunta de cada vez**. Responde no chat para avançar!\n\n` +
-        `📌 **Pergunta 1/15:**\n${PERGUNTAS_RECRUTAMENTO[0]}`
-      );
-
-      return await interaction.editReply({
-        content: `✅ O teu canal privado de recrutamento foi aberto com sucesso! Clica aqui para aceder: ${thread}`
-      });
-
-    } catch (error) {
-      console.error('❌ Erro ao iniciar recrutamento:', error);
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({
-          content: `❌ Ocorreu um erro ao abrir a tua sala de recrutamento: \`${error.message}\``
-        });
-      }
-    }
-  }
-});
-
-// 3. Ouvir as Respostas do Candidato no Chat (Passo a Passo)
-client.on('messageCreate', async (message) => {
-  if (message.author.bot || !message.channel.isThread()) return;
-
-  const sessao = recrutamentosAtivos.get(message.channel.id);
-  if (!sessao) return;
-
-  // Garante que só o candidato responde
-  if (message.author.id !== sessao.userId) return;
-
-  // Salva a resposta da pergunta atual
-  sessao.respostas.push({
-    pergunta: PERGUNTAS_RECRUTAMENTO[sessao.perguntaAtual],
-    resposta: message.content
-  });
-
-  sessao.perguntaAtual++;
-
-  // Se ainda houver perguntas pendentes, envia a próxima
-  if (sessao.perguntaAtual < PERGUNTAS_RECRUTAMENTO.length) {
-    await message.channel.send(
-      `📌 **Pergunta ${sessao.perguntaAtual + 1}/15:**\n${PERGUNTAS_RECRUTAMENTO[sessao.perguntaAtual]}`
-    );
-  } else {
-    // FINALIZOU TODAS AS 15 PERGUNTAS!
-    await message.channel.send('✅ **Edital concluído com sucesso!** A compilar e enviar a tua ficha para a liderança...');
-
-    const guild = message.guild;
-    const canalLogs = guild ? guild.channels.cache.get(ID_CANAL_LOGS_RECRUTAMENTO) : null;
-
-    if (canalLogs) {
-      const embed = new EmbedBuilder()
-        .setTitle('📥 **NOVA CANDIDATURA - EDITAL DA TURQUIA**')
-        .setColor('#e74c3c')
-        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: '👤 Candidato', value: `${message.author} (\`${message.author.id}\`)`, inline: false }
-        )
-        .setFooter({ text: 'Sistema de Recrutamento Passo a Passo - Turquia', iconURL: guild ? guild.iconURL() : null })
-        .setTimestamp();
-
-      // Formata as 15 perguntas e respostas
-      sessao.respostas.forEach((item, index) => {
-        embed.addFields({
-          name: `${item.pergunta}`,
-          value: item.resposta.length > 1024 ? item.resposta.substring(0, 1021) + '...' : item.resposta,
-          inline: false
-        });
-      });
-
-      await canalLogs.send({
-        content: `🔔 **Nova candidatura concluída por ${message.author}!**`,
-        embeds: [embed]
-      });
-    }
-
-    // Limpa a sessão da memória e encerra a thread
-    recrutamentosAtivos.delete(message.channel.id);
-
-    await message.channel.send('🔒 **Este canal será encerrado em 5 segundos.** Obrigado por fazer o recrutamento!');
-
-    setTimeout(async () => {
-      try {
-        await message.channel.delete();
-      } catch (e) {
-        console.error('Erro ao apagar thread:', e);
-      }
-    }, 5000);
-  }
-});
-
-// ===================================================
-// COMANDO SLASH: /chat (Limpeza de Mensagens)
-// ===================================================
-
-// 1. Registar o comando no Discord assim que o bot iniciar
-client.on('ready', async () => {
-  try {
-    await client.application.commands.set([
-      {
-        name: 'chat',
-        description: 'Limpa todas as mensagens do canal atual.',
-        default_member_permissions: '8192' // Permissão de Gerenciar Mensagens
-      }
-    ]);
-    console.log('✅ Comando /chat registado com sucesso no Discord!');
-  } catch (err) {
-    console.error('❌ Erro ao registar comando /chat:', err);
-  }
-});
-
-// 2. Executar a limpeza quando alguém usar /chat
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName !== 'chat') return;
-
-  try {
-    // Verificar se o utilizador tem permissão de Gerenciar Mensagens
-    if (!interaction.member.permissions.has('ManageMessages')) {
-      return await interaction.reply({
-        content: '❌ Não tens permissão (Gerenciar Mensagens) para usar este comando.',
-        ephemeral: true
-      });
-    }
-
-    await interaction.deferReply({ ephemeral: true });
-
-    const channel = interaction.channel;
-
-    // Verificar se o bot tem permissão no canal
-    if (!channel.permissionsFor(client.user).has('ManageMessages')) {
-      return await interaction.editReply({
-        content: '❌ O bot precisa da permissão **Gerenciar Mensagens** neste canal!'
-      });
-    }
-
-    let apagadasTotal = 0;
-    let mensagens;
-
-    do {
-      mensagens = await channel.messages.fetch({ limit: 100 });
-      // Filtra apenas mensagens com menos de 14 dias (limitação do Discord)
-      const mensagensRecentes = mensagens.filter(m => (Date.now() - m.createdTimestamp) < 1209600000);
-
-      if (mensagensRecentes.size > 0) {
-        const apagadas = await channel.bulkDelete(mensagensRecentes, true);
-        apagadasTotal += apagadas.size;
-      }
-
-      // Se só houver mensagens antigas (+14 dias), encerra o loop
-      if (mensagens.size > 0 && mensagensRecentes.size === 0) {
-        break;
-      }
-
-    } while (mensagens.size >= 2);
-
-    return await interaction.editReply({
-      content: `🧹 **Chat limpo com sucesso!** Foram removidas ${apagadasTotal} mensagens.`
-    });
-
-  } catch (error) {
-    console.error('❌ Erro no comando /chat:', error);
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({
-        content: `❌ Ocorreu um erro ao tentar limpar o chat: \`${error.message}\``
-      });
-    }
-  }
-});
