@@ -11,7 +11,9 @@ const {
   ChannelType
 } = require('discord.js');
 
-// === SERVIDOR PARA MANTER O BOT ONLINE NA RENDER ===
+// ===================================================
+// SERVIDOR HTTP PARA MANTER O BOT ONLINE NA RENDER
+// ===================================================
 const express = require('express');
 const app = express();
 
@@ -25,7 +27,7 @@ app.listen(PORT, () => {
 });
 
 // ===================================================
-// CONFIGURAÇÕES DO BOT E IDs
+// CONFIGURAÇÕES DO BOT E IDs PREENCHIDOS
 // ===================================================
 const CONFIG = {
   ID_CANAL_LOGS_PONTO: '1563319588614045776',
@@ -34,8 +36,8 @@ const CONFIG = {
 };
 
 const CARGO_CIDADAO_ID = '1562603190653026352'; 
-const ID_CANAL_LOGS_REGISTRO = '1562603191324115092'; 
 const ID_CANAL_PAINEL_REGISTO = '1562603191324115091';
+const ID_CANAL_LOGS_REGISTRO = '1562603191324115092'; 
 
 const ID_CANAL_BEM_VINDO = '1562603191324115087';
 const ID_CANAL_SAIDA = '1562603191324115088';
@@ -43,7 +45,9 @@ const ID_CANAL_SAIDA = '1562603191324115088';
 const ID_CANAL_PAINEL_RECRUTAMENTO = '1562603191625977900';
 const ID_CANAL_LOGS_RECRUTAMENTO = '1563928804290986165';
 
-// Memórias temporárias
+const BANNER_TURQUIA_REGISTO = 'https://cdn.discordapp.com/attachments/1562603191806337097/1563635816029491230/Tropa_da_Turquia__Banner.png?ex=6ae05315&is=6adf0195&hm=3bd25a4ec9e0d1587f915c0ae555f0ac9882f8858f7ccdfb6d4306665e87bcb2&';
+
+// Memórias temporárias em execução
 const sessoesPonto = new Map();
 const recrutamentosAtivos = new Map();
 
@@ -57,12 +61,12 @@ const client = new Client({
 });
 
 // ===================================================
-// EVENTO READY (UNIFICADO - ENVIA TODOS OS PAINÉIS)
+// EVENTO READY (ENVIA E ATUALIZA OS PAINÉIS AUTOMATICAMENTE)
 // ===================================================
 client.once('ready', async () => {
   console.log(`✅ Bot online como ${client.user.tag}!`);
 
-  // 1. Enviar Painel de Registo
+  // 1. PAINEL DE REGISTO
   const canalRegisto = client.channels.cache.get(ID_CANAL_PAINEL_REGISTO);
   if (canalRegisto) {
     try {
@@ -92,7 +96,7 @@ client.once('ready', async () => {
           `ℹ️ **· Por que realizar a verificação?**\n` +
           `O sistema de verificação é essencial para manter a organização, o controlo de membros e garantir um ambiente limpo e seguro para a nossa comunidade.`
         )
-        .setImage('https://i.imgur.com/8Q6Vp2D.png');
+        .setImage(BANNER_TURQUIA_REGISTO);
 
       await canalRegisto.send({
         embeds: [embedRegisto],
@@ -105,7 +109,7 @@ client.once('ready', async () => {
     }
   }
 
-  // 2. Enviar Painel de Recrutamento
+  // 2. PAINEL DE RECRUTAMENTO
   const canalRecrutamento = client.channels.cache.get(ID_CANAL_PAINEL_RECRUTAMENTO);
   if (canalRecrutamento) {
     try {
@@ -207,7 +211,7 @@ client.on('messageCreate', async (message) => {
 });
 
 // ===================================================
-// GERENCIADOR DE INTERAÇÕES (REGISTO, PONTO E RECRUTAMENTO)
+// GERENCIADOR DE INTERAÇÕES (REGISTO, BATE-PONTO E RECRUTAMENTO)
 // ===================================================
 client.on('interactionCreate', async (interaction) => {
   try {
@@ -507,5 +511,7 @@ async function enviarLogRegistro(guild, titulo, descricao, cor = 0x00FF00) {
   }
 }
 
-// Login do Bot
+// ===================================================
+// LOGIN DO BOT
+// ===================================================
 client.login(process.env.DISCORD_TOKEN);
