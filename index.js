@@ -530,3 +530,81 @@ client.on('messageCreate', async (message) => {
   }
 });
 
+// ===================================================
+// COMANDO SLASH: /chat (Limpeza de Mensagens)
+// ===================================================
+
+// 1. Registar o comando no Discord assim que o bot iniciar
+client.on('ready', async () => {
+  try {
+    await client.application.commands.set([
+      {
+        name: 'chat',
+        description: 'Limpa todas as mensagens do canal atual.',
+        default_member_permissions: '8192' // Permissão de Gerenciar Mensagens
+      }
+    ]);
+    console.log('✅ Comando /chat registado com sucesso no Discord!');
+  } catch (err) {
+    console.error('❌ Erro ao registar comando /chat:', err);
+  }
+});
+
+// 2. Executar a limpeza quando alguém usar /chat
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  if (interaction.commandName !== 'chat') return;
+
+  try {
+    // Verificar se o utilizador tem permissão de Gerenciar Mensagens
+    if (!interaction.member.permissions.has('ManageMessages')) {
+      return await interaction.reply({
+        content: '❌ Não tens permissão (Gerenciar Mensagens) para usar este comando.',
+        ephemeral: true
+      });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const channel = interaction.channel;
+
+    // Verificar se o bot tem permissão no canal
+    if (!channel.permissionsFor(client.user).has('ManageMessages')) {
+      return await interaction.editReply({
+        content: '❌ O bot precisa da permissão **Gerenciar Mensagens** neste canal!'
+      });
+    }
+
+    let apagadasTotal = 0;
+    let mensagens;
+
+    do {
+      mensagens = await channel.messages.fetch({ limit: 100 });
+      // Filtra apenas mensagens com menos de 14 dias (limitação do Discord)
+      const mensagensRecentes = mensagens.filter(m => (Date.now() - m.createdTimestamp) < 1209600000);
+
+      if (mensagensRecentes.size > 0) {
+        const apagadas = await channel.bulkDelete(mensagensRecentes, true);
+        apagadasTotal += apagadas.size;
+      }
+
+      // Se só houver mensagens antigas (+14 dias), encerra o loop
+      if (mensagens.size > 0 && mensagensRecentes.size === 0) {
+        break;
+      }
+
+    } while (mensagens.size >= 2);
+
+    return await interaction.editReply({
+      content: `🧹 **Chat limpo com sucesso!** Foram removidas ${apagadasTotal} mensagens.`
+    });
+
+  } catch (error) {
+    console.error('❌ Erro no comando /chat:', error);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({
+        content: `❌ Ocorreu um erro ao tentar limpar o chat: \`${error.message}\``
+      });
+    }
+  }
+});
